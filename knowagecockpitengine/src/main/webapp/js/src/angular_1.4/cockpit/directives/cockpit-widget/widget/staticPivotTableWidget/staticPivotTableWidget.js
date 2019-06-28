@@ -78,7 +78,9 @@ function cockpitStaticPivotTableWidgetControllerFunction(
 		cockpitModule_generalOptions,
 		$mdDialog,
 		sbiModule_device,
-		sbiModule_i18n){
+		sbiModule_i18n,
+		$timeout,
+		cockpitModule_properties){
 
 
 
@@ -95,7 +97,7 @@ function cockpitStaticPivotTableWidgetControllerFunction(
 					var propToReturn = {};
 					for (p in objProp){
 						if (!admitObject && p.startsWith("{\"")){
-							continue;	//skip the object element. ONLY attribute are added
+							continue;	//skip the object element. ONLY attributes are added
 						}
 						propToReturn[p] = objProp[p];
 					}
@@ -107,12 +109,27 @@ function cockpitStaticPivotTableWidgetControllerFunction(
 		return toReturn;
 	}
 
+	$scope.addDynamicWidthClass = function(elem){
+		elem.classList.add('crosstab-fill-width');
+		elem.style['table-layout'] = 'auto';
+	}
+
+	$scope.removeDynamicWidthClass = function(elem){
+		elem.classList.remove("crosstab-fill-width");
+	}
+	
 	$scope.refresh=function(element,width,height, datasetRecords,nature){
 		if(datasetRecords==undefined){
 			return;
 		}
 
 		if(nature == 'resize' || nature == 'gridster-resized' || nature == 'fullExpand'){
+			var fatherElement = angular.element($scope.subCockpitWidget);
+			if(fatherElement[0].children[0] && (fatherElement[0].children[0].clientWidth < fatherElement[0].clientWidth)) {
+				$scope.addDynamicWidthClass(fatherElement[0].children[0]);	
+			}else{
+//				$scope.removeDynamicWidthClass(fatherElement[0].children[0]);	
+			}
 			return;
 		}
 		$scope.showWidgetSpinner();
@@ -151,16 +168,27 @@ function cockpitStaticPivotTableWidgetControllerFunction(
 
 		sbiModule_restServices.promisePost("1.0/crosstab","update",dataToSend).then(
 				function(response){
+					var fatherElement = angular.element($scope.subCockpitWidget);
 					$scope.subCockpitWidget.html(response.data.htmlTable);
 					$scope.addPivotTableStyle();
 					$scope.hideWidgetSpinner();
-					$compile(angular.element($scope.subCockpitWidget).contents())($scope);
+					$compile(fatherElement.contents())($scope);
+					if(fatherElement[0].children[0] && (fatherElement[0].children[0].clientWidth < fatherElement[0].clientWidth)) {
+						$scope.addDynamicWidthClass(fatherElement[0].children[0]);	
+					}
 				},
 				function(response){
 					sbiModule_restServices.errorHandler(response.data,"Pivot Table Error")
 					$scope.hideWidgetSpinner();
 					}
 				)
+				
+		if(nature == 'init'){
+			$timeout(function(){
+				$scope.widgetIsInit=true;
+				cockpitModule_properties.INITIALIZED_WIDGETS.push($scope.ngModel.id);
+			},500);
+		}
 	}
 
 	// returns the internationalized crosstab definition
@@ -398,7 +426,10 @@ function cockpitStaticPivotTableWidgetControllerFunction(
 			}
 
 			//altrnateRow & grid border
-			if($scope.ngModel.content.style.showAlternateRows &&  $scope.ngModel.content.style.measuresRow!=undefined && Object.keys($scope.ngModel.content.style.measuresRow).length>0 ){
+			if($scope.ngModel.content.style.showGrid ||
+			   ($scope.ngModel.content.style.showAlternateRows &&
+			    $scope.ngModel.content.style.measuresRow!=undefined &&
+			    Object.keys($scope.ngModel.content.style.measuresRow).length>0)){
 				var rowList=angular.element($scope.subCockpitWidget[0].querySelectorAll("tr"));
 				var tmpOddRow=false;
 				angular.forEach(rowList,function(row,index){
@@ -457,12 +488,14 @@ function cockpitStaticPivotTableWidgetControllerFunction(
 					}
 					if(dataColumnList.length>0){
 						//alternateRow
-						if(tmpOddRow && $scope.ngModel.content.style.measuresRow["odd-background-color"]!= ""){
-							angular.element(dataColumnList).css("background-color",$scope.ngModel.content.style.measuresRow["odd-background-color"])
-						}else if ($scope.ngModel.content.style.measuresRow["even-background-color"]!= ""){
-							angular.element(dataColumnList).css("background-color",$scope.ngModel.content.style.measuresRow["even-background-color"])
+						if ($scope.ngModel.content.style.showAlternateRows){
+							if(tmpOddRow && $scope.ngModel.content.style.measuresRow["odd-background-color"]!= ""){
+								angular.element(dataColumnList).css("background-color",$scope.ngModel.content.style.measuresRow["odd-background-color"])
+							}else if ($scope.ngModel.content.style.measuresRow["even-background-color"]!= ""){
+								angular.element(dataColumnList).css("background-color",$scope.ngModel.content.style.measuresRow["even-background-color"])
+							}
+							tmpOddRow=!tmpOddRow;
 						}
-						tmpOddRow=!tmpOddRow;
 
 						//border cell style
 						$scope.applyBorderStyle(dataColumnList);
@@ -669,6 +702,20 @@ function cockpitStaticPivotTableWidgetControllerFunction(
 			    		  $scope.changeDatasetFunction($scope.localModel.dataset.dsId,true)
 			    	  }
 
+			    	  //default labels
+			    	  if (!$scope.localModel.content.crosstabDefinition.config.rowsubtotalLabel || $scope.localModel.content.crosstabDefinition.config.rowsubtotalLabel == ''){
+			    		  $scope.localModel.content.crosstabDefinition.config.rowsubtotalLabel = sbiModule_translate.load('sbi.crosstab.crosstabdetailswizard.defaultSubtotalLabel') ;
+			    	  }
+			    	  if (!$scope.localModel.content.crosstabDefinition.config.rowtotalLabel || $scope.localModel.content.crosstabDefinition.config.rowtotalLabel == ''){
+			    		  $scope.localModel.content.crosstabDefinition.config.rowtotalLabel = sbiModule_translate.load('sbi.crosstab.crosstabdetailswizard.defaultTotalLabel') ;
+			    	  }
+			    	  if (!$scope.localModel.content.crosstabDefinition.config.columnsubtotalLabel || $scope.localModel.content.crosstabDefinition.config.columnsubtotalLabel == ''){
+			    		  $scope.localModel.content.crosstabDefinition.config.columnsubtotalLabel = sbiModule_translate.load('sbi.crosstab.crosstabdetailswizard.defaultSubtotalLabel') ;
+			    	  }
+			    	  if (!$scope.localModel.content.crosstabDefinition.config.columntotalLabel || $scope.localModel.content.crosstabDefinition.config.columntotalLabel == ''){
+			    		  $scope.localModel.content.crosstabDefinition.config.columntotalLabel = sbiModule_translate.load('sbi.crosstab.crosstabdetailswizard.defaultTotalLabel') ;
+			    	  }
+
 			    	  //remove used measure and attribute
 			    	 $scope.clearUsedMeasureAndAttribute=function(){
 			    		 if($scope.currentDataset.metadata==undefined){
@@ -816,15 +863,17 @@ function cockpitStaticPivotTableWidgetControllerFunction(
 
 			    	 $scope.editFieldsProperty=function(selectedColumn){
 			    		  selectedColumn.sorterByColumns = $scope.getSorterByColumns($scope.currentDataset); //load all columns to manage external sort column
-			    		  var guiSortOptions = fnOrder(model.content.crosstabDefinition.columns, model.content.crosstabDefinition.rows);
-			    		  var templateSortOptions = model.content.sortOptions;
-			    		  if (!angular.equals(guiSortOptions, templateSortOptions)){
-			    			  selectedColumn.showSortingAlert = true;
-			    			  console.log("ATTENTION: The user had save sortings manually that are different by the configuration set. The system are using the first ones.");
-			    			  console.log("templateSortOptions:", templateSortOptions);
-			    			  console.log("guiSortOptions:", guiSortOptions);
-			    		  }else{
-			    				selectedColumn.showSortingAlert = false;
+			    		  if (model.content.crosstabDefinition){
+				    		  var guiSortOptions = fnOrder(model.content.crosstabDefinition.columns, model.content.crosstabDefinition.rows);
+				    		  var templateSortOptions = model.content.sortOptions;
+				    		  if (!angular.equals(guiSortOptions, templateSortOptions)){
+				    			  selectedColumn.showSortingAlert = true;
+				    			  console.log("ATTENTION: The user had save sortings manually that are different by the configuration set. The system are using the first ones.");
+				    			  console.log("templateSortOptions:", templateSortOptions);
+				    			  console.log("guiSortOptions:", guiSortOptions);
+				    		  }else{
+				    				selectedColumn.showSortingAlert = false;
+				    		  }
 			    		  }
 			    		  selectedColumn.fnOrder = fnOrder;
 			    		  $mdDialog.show({

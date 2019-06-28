@@ -17,7 +17,6 @@
  */
 package it.eng.qbe.query.filters;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -25,13 +24,18 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.jgrapht.Graph;
 
 import it.eng.qbe.datasource.IDataSource;
 import it.eng.qbe.model.accessmodality.AbstractModelAccessModality;
 import it.eng.qbe.model.structure.IModelEntity;
 import it.eng.qbe.model.structure.IModelStructure;
-import it.eng.qbe.query.Query;
+import it.eng.qbe.statement.IStatement;
+import it.eng.qbe.statement.graph.GraphManager;
+import it.eng.qbe.statement.graph.bean.QueryGraph;
+import it.eng.qbe.statement.graph.bean.Relationship;
 import it.eng.qbe.statement.graph.bean.RootEntitiesGraph;
+import it.eng.spago.configuration.ConfigSingleton;
 import it.eng.spagobi.commons.bo.UserProfile;
 
 /**
@@ -45,30 +49,42 @@ public class SqlFilterModelAccessModality extends AbstractModelAccessModality {
 
 	private UserProfile userProfile = null;
 
-	public ArrayList<IModelEntity> getSqlFilterEntities(Query query, IDataSource dataSource) {
+	public Set<IModelEntity> getSqlFilterEntities(IDataSource dataSource, Set<IModelEntity> queryEntitiesa) {
 		Set<IModelEntity> sqlFilterEntities = new HashSet<>();
+
+		Set<IModelEntity> queryEntities = new HashSet<IModelEntity>(queryEntitiesa);
 		IModelStructure modelStructure = dataSource.getModelStructure();
+
 		Map<String, IModelEntity> entity = modelStructure.getEntities();
 		Collection<IModelEntity> entities = entity.values();
-		Set<IModelEntity> queryEntities = query.getQueryEntities(dataSource);
+
 		RootEntitiesGraph rootEntitiesGraph = modelStructure.getRootEntitiesGraph(dataSource.getConfiguration().getModelName(), false);
 
 		Iterator<IModelEntity> iterator = entities.iterator();
+
 		while (iterator.hasNext()) {
-			Set<IModelEntity> tempEntities = new HashSet<>();
+
 			IModelEntity tempEntity = iterator.next();
 
 			if (!tempEntity.getProperties().get("sqlFilter").equals("")) {
-				tempEntities.add(tempEntity);
-				tempEntities.addAll(queryEntities);
-				boolean realtionship = rootEntitiesGraph.areRootEntitiesConnected(tempEntities);
+				queryEntities.add(tempEntity);
+				boolean realtionship = rootEntitiesGraph.areRootEntitiesConnected(queryEntities);
 				if (realtionship) {
-					sqlFilterEntities.addAll(tempEntities);
+					sqlFilterEntities.addAll(queryEntities);
 				}
 			}
 		}
 
-		return new ArrayList<IModelEntity>(sqlFilterEntities);
+		return sqlFilterEntities;
+	}
+
+	public QueryGraph setGraphWithSqlQueryEntities(Set<IModelEntity> unjoinedEntities, IStatement parentStatement) {
+		String modelNameFM = parentStatement.getDataSource().getConfiguration().getModelName();
+		Graph<IModelEntity, Relationship> rootEntitiesGraphFM = parentStatement.getDataSource().getModelStructure().getRootEntitiesGraph(modelNameFM, false)
+				.getRootEntitiesGraph();
+
+		return GraphManager.getDefaultCoverGraphInstance(((String) ConfigSingleton.getInstance().getAttribute("QBE.GRAPH-PATH.defaultCoverImpl")))
+				.getCoverGraph(rootEntitiesGraphFM, unjoinedEntities);
 	}
 
 }

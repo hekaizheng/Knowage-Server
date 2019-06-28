@@ -18,7 +18,7 @@
 package it.eng.qbe.statement.jpa;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +33,6 @@ import org.hibernate.Session;
 
 import it.eng.qbe.datasource.jpa.IJpaDataSource;
 import it.eng.qbe.model.accessmodality.IModelAccessModality;
-import it.eng.qbe.model.structure.IModelStructure;
 import it.eng.qbe.statement.AbstractQbeDataSet;
 import it.eng.qbe.statement.IStatement;
 import it.eng.spagobi.tools.dataset.common.iterator.DataIterator;
@@ -92,11 +91,10 @@ public class JPQLDataSet extends AbstractQbeDataSet {
 		IStatement filteredStatement = this.getStatement();
 		String statementStr = filteredStatement.getQueryString();
 		logger.debug("Compiling query statement [" + statementStr + "]");
-
 		javax.persistence.Query jpqlQuery = entityManager.createQuery(statementStr);
 
 		if (this.isCalculateResultNumberOnLoadEnabled()) {
-			resultNumber = getResultNumber(statementStr, jpqlQuery, entityManager);
+			resultNumber = getResultNumber(jpqlQuery);
 			logger.info("Number of fetched records: " + resultNumber + " for query " + filteredStatement.getQueryString());
 			overflow = (maxResults > 0) && (resultNumber >= maxResults);
 		}
@@ -142,82 +140,42 @@ public class JPQLDataSet extends AbstractQbeDataSet {
 	 * @param runtimeDrivers
 	 */
 	private void enableFilters(Session session) {
-		HashMap<String, Object> drivers = this.getDrivers();
-//		if (drivers != null) {
-		EntityManager entityManager = getEntityMananger();
-		IModelStructure structure = this.statement.getDataSource().getModelStructure();
-		Filter filter;
-		Set filterNamesR = session.getSessionFactory().getDefinedFilterNames();
-		Iterator it = filterNamesR.iterator();
-		String driverName = null;
+		Map<String, Object> drivers = this.getDrivers();
+		if (drivers != null) {
+			if (drivers.isEmpty() == false) {
+				Filter filter = null;
+				Set<String> filterNames = session.getSessionFactory().getDefinedFilterNames();
+				Iterator<String> it = filterNames.iterator();
+				String driverName = null;
 
-		while (it.hasNext()) {
-			String filterName = (String) it.next();
-			filter = session.enableFilter(filterName);
-			Map driverUrlNames = filter.getFilterDefinition().getParameterTypes();
-
-			Iterator iter = drivers.entrySet().iterator();
-			while (iter.hasNext()) {
-				Map.Entry pair = (Map.Entry) iter.next();
-				for (Object key : driverUrlNames.keySet()) {
-					driverName = key.toString();
-					if (pair.getKey().toString().equals(driverName)) {
-
-						filter.setParameter(pair.getKey().toString(), pair.getValue());
+				while (it.hasNext()) {
+					String filterName = it.next();
+					filter = session.enableFilter(filterName);
+					Map<String, String> driverUrlNames = filter.getFilterDefinition().getParameterTypes();
+					for (String key : driverUrlNames.keySet()) {
+						driverName = key.toString();
+						Map mapOfValues = (Map) drivers.get(driverName);
+						if (mapOfValues.get("value") instanceof List) {
+							filter.setParameterList(driverName, (Collection) mapOfValues.get("value"));
+						} else if (mapOfValues.get("value") instanceof Map) {
+							Map defaultValue = (Map) mapOfValues.get("value");
+							filter.setParameter(driverName, defaultValue.get("value"));
+						} else {
+							filter.setParameter(driverName, mapOfValues.get("value"));
+						}
 					}
 				}
 			}
 		}
-		// }
 	}
 
-	private int getResultNumber(String statementStr, Query jpqlQuery, EntityManager entityManager) {
+	private int getResultNumber(Query jpqlQuery) {
 		int resultNumber = 0;
-
 		try {
-			logger.debug("Reading result number using an inline-view");
-			resultNumber = getResultNumberUsingInlineView(statementStr, entityManager);
-			logger.debug("Result number sucesfully read using an inline view (resultNumber=[" + resultNumber + "])");
-		} catch (Throwable t1) {
-			logger.warn("Error reading result number using inline view", t1);
-
-			logger.debug("Reading result number executing the original query");
-			try {
-				resultNumber = (jpqlQuery).getResultList().size();
-			} catch (Throwable t2) {
-				logger.error(t2);
-				throw new RuntimeException("Impossible to read result number", t2);
-			}
-			logger.debug("Result number sucesfully read using the original query(resultNumber=[" + resultNumber + "])");
+			resultNumber = jpqlQuery.getResultList().size();
+		} catch (Exception e) {
+			throw new RuntimeException("Impossible to get result number", e);
 		}
-
-		return resultNumber;
-	}
-
-	/**
-	 * Get the result number with an in line view
-	 *
-	 * @param jpqlQuery
-	 * @param entityManager
-	 * @return
-	 * @throws Exception
-	 */
-	private int getResultNumberUsingInlineView(String jpqlQuery, EntityManager entityManager) throws Exception {
-		int resultNumber = 0;
-		logger.debug("IN: counting query result");
-
-		JPQL2SQLStatementRewriter translator = new JPQL2SQLStatementRewriter(entityManager);
-		String sqlQueryString = translator.rewrite(jpqlQuery);
-		javax.persistence.Query countQuery = entityManager.createNativeQuery("SELECT COUNT(*) FROM (" + sqlQueryString + ") temp");
-
-		logger.debug("Count query prepared and parameters setted...");
-		logger.debug("Executing query...");
-		resultNumber = ((Number) countQuery.getResultList().get(0)).intValue();
-		logger.debug("Query " + "SELECT COUNT(*) FROM (" + sqlQueryString + ")" + " executed");
-		logger.debug("Result number is " + resultNumber);
-		resultNumber = resultNumber < 0 ? 0 : resultNumber;
-		logger.debug("OUT: returning " + resultNumber);
-
 		return resultNumber;
 	}
 
@@ -259,6 +217,10 @@ public class JPQLDataSet extends AbstractQbeDataSet {
 		try {
 
 			EntityManager entityManager = ((IJpaDataSource) statement.getDataSource()).getEntityManager();
+
+			Session session = (Session) entityManager.getDelegate();
+			enableFilters(session);
+
 			IStatement filteredStatement = getStatement();
 			String statementStr = filteredStatement.getQueryString();
 			logger.debug("Compiling query statement [" + statementStr + "]");
@@ -286,7 +248,7 @@ public class JPQLDataSet extends AbstractQbeDataSet {
 	 * @see it.eng.spagobi.tools.dataset.bo.IDataSet#getDrivers()
 	 */
 	@Override
-	public HashMap<String, Object> getDrivers() {
+	public Map<String, Object> getDrivers() {
 		return super.getDrivers();
 	}
 
@@ -296,7 +258,7 @@ public class JPQLDataSet extends AbstractQbeDataSet {
 	 * @see it.eng.spagobi.tools.dataset.bo.IDataSet#setDrivers()
 	 */
 	@Override
-	public void setDrivers(HashMap<String, Object> drivers) {
+	public void setDrivers(Map<String, Object> drivers) {
 		super.setDrivers(drivers);
 	}
 

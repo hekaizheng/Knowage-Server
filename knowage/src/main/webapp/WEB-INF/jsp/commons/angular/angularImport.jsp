@@ -26,7 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <meta name="apple-mobile-web-app-title" content="Knowage">
 <link rel="manifest" href="<%=urlBuilder.getResourceLink(request,"/manifest.json")%>">
 
-<link rel="stylesheet" href="<%=urlBuilder.getResourceLink(request,"/themes/sbi_default/fonts/font-awesome-4.4.0/css/font-awesome.min.css")%>">
+<link rel="stylesheet" href="<%=urlBuilder.getResourceLink(request,"/node_modules/font-awesome/css/font-awesome.min.css")%>">
+
 
 <!-- angular reference-->
 <!-- START-DEBUG -->
@@ -63,6 +64,7 @@ if (!String.prototype.endsWith) {
 	};
 }
 </script>
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "/polyfills/includes-polyfill/includes-polyfill.js")%>"></script>
 
 <!-- angular-material-->
 
@@ -127,8 +129,7 @@ if(importAngularMaterialForExport == null) {
 
 <!-- deprecated angular 2 col -->
 <script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/js/src/angular_1.4/tools/commons/angular-list-detail/angular2Col.js")%>"></script> 
-	
-	 
+
 <!-- toastr -->
 <link rel="stylesheet" type="text/css" href="<%=urlBuilder.getResourceLink(request,"/themes/sbi_default/css/angular-toastr.css")%>">
 <script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/js/src/angular_1.4/tools/commons/angular-toastr.tpls.js")%>"></script> 		
@@ -141,15 +142,32 @@ if(importAngularMaterialForExport == null) {
 <link rel="stylesheet" href="<%=urlBuilder.getResourceLink(request,"/js/lib/angular/color-picker/angularjs-color-picker.min.css")%>">
 <link rel="stylesheet" href="<%=urlBuilder.getResourceLink(request,"/js/lib/angular/color-picker/mdColorPickerPersonalStyle.css")%>">
 
+<!--  wysiwyg -->
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/js/lib/angular/ngWYSIWYG/wysiwyg.min.js")%>"></script>	
+<link rel="stylesheet" type="text/css" href="<%=urlBuilder.getResourceLink(request,"/js/lib/angular/ngWYSIWYG/editor.min.css")%>">
+
 <!-- qbe viewer -->
 <script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/js/src/angular_1.4/tools/workspace/scripts/services/qbeViewer.js")%>"></script> 
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/js/src/angular_1.4/tools/workspace/scripts/services/qbeViewerCommunicationService.js")%>"></script> 
 
+<!-- dataset save -->
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/workspace/scripts/directive/dataset-save/datasetSaveModule.js")%>"></script>
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/workspace/scripts/directive/dataset-save/datasetSave.js")%>"></script>
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/workspace/scripts/services/datasetSave_service.js")%>"></script>
+
+<!-- dataset scheduler -->
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/scheduler/dataset-scheduler/datasetSchedulerModule.js")%>"></script>
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/scheduler/dataset-scheduler/datasetScheduler.js")%>"></script>
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/scheduler/dataset-scheduler/datasetScheduler_service.js")%>"></script>
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/scheduler/dataset-scheduler/schedulerTimeUnit.js")%>"></script>
 <!-- xml2js -->
-<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/js/lib/xml2js/jquery-2.1.3.min.js")%>"></script> 
+
+
 <script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/js/lib/xml2js/xml2json.js")%>"></script> 
 
 <!-- angular-base64 -->
 <script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/js/lib/angular/angular-base64/angular-base64.min.js")%>"></script> 
+
 
 <!-- angular JSON FORMATTER -->
 <script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/node_modules/jsonformatter/dist/json-formatter.min.js")%>"></script> 
@@ -158,11 +176,11 @@ if(importAngularMaterialForExport == null) {
 <script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/node_modules/xregexp/xregexp-all.js")%>"></script>
 <script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/node_modules/angular-xregexp/angular-xregexp.js")%>"></script> 
 
-<!-- AG GRID -->
-<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/node_modules/ag-grid/dist/ag-grid.min.js")%>"></script>
-
-<!-- LOCALIZATION -->
 <link rel="stylesheet" href="<%=urlBuilder.getResourceLink(request,"/themes/commons/css/customStyle.css")%>">
 
 <%@include file="/WEB-INF/jsp/commons/angular/sbiModule.jspf"%>
+
+<!-- AG GRID -->
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/node_modules/ag-grid-community/dist/ag-grid-community.min.js")%>"></script>
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/js/src/angular_1.4/tools/commons/services/knModule_aggridLabels.js")%>"></script>
 	

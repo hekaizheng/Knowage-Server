@@ -72,9 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 	<angular-list-detail show-detail="showMe">
  		<list label='translate.load("sbi.behavioural.lov.title")' new-function="createLov"> 
 
-			 	
+			 <md-input-container md-no-float class="md-block md-icon-right" style="padding-left:8px">
+	      		<input ng-model="search" type="text" placeholder="Search" >
+		      	<md-icon md-font-icon="fa fa-search" style="display:inline-block;"></md-icon>
+		    </md-input-container>
 				
-				 <angular-table
+				 <!-- angular-table
 			flex
 			id="listOfLovs_id" 
 			ng-model="listOfLovs"
@@ -88,7 +91,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 			highlights-selected-item=true
 			speed-menu-option="lovsManagementSpeedMenu"
 			click-function="itemOnClick(item)">
-		     </angular-table>
+		     </angular-table-->
+		     
+		     <kn-table
+				columns=lovTableColumns
+				model=listOfLovs search-model="search"
+				click-function="itemOnClick(item)" custom-class="kn-table-clickable-rows kn-table-medium-rows kn-background-transparent kn-height-auto"></kn-table>		
 		
 
 		</list>
@@ -316,26 +324,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		
 		<div ng-if="selectedLov.itypeCd == lovItemEnum.DATASET">    
 			
-			<div layout="row" layout-wrap>
-      				<div flex=100>
-				       <md-input-container class="md-block" > 
-				       <label>{{translate.load("sbi.datasource.label")}}</label>
-				       <md-select  aria-label="dropdown" placeholder ="{{translate.load('sbi.behavioural.lov.placeholder.dataset')}}"
-				       	name ="datasetDropdown" 
-				        ng-required = "selectedLov.itypeCd == lovItemEnum.DATASET"
-				        ng-model="selectedDataset.id"
-				        ng-change="changeType(selectedDataset.name,'dataset')"
-				        > <md-option 
-				        ng-repeat="l in listOfDatasets track by $index" value="{{l.id}}">{{l.label}} </md-option>
-				       </md-select>
-				       <div  ng-messages="attributeForm.dropdown.$error" ng-show="selectedDataset.id == null">
-				        <div ng-message="required">{{translate.load("sbi.catalogues.generic.reqired");}}</div>
-				      </div>   
-				        </md-input-container>
-				   </div>
-			</div>
-		
-				   
+			<div layout="row">
+		        	<md-input-container flex>
+		        		<label>{{translate.load("sbi.ds.label")}}</label>
+		        		<input type="text" disabled value="{{selectedDataset.label}}">
+		        	</md-input-container>
+		        	<md-input-container flex>
+		        		<label>{{translate.load("sbi.ds.name")}}</label>
+		        		<input type="text" disabled value="{{selectedDataset.name}}">
+		        	</md-input-container>
+			        <md-button class="md-icon-button" ng-click="getDatasets()">
+			        	<md-tooltip>{{::translate.load("sbi.functionscatalog.adddataset")}}</md-tooltip>
+			        	<md-icon md-font-icon="fa fa-search"></md-icon>
+			        </md-button>
+			</div>			   
 		</div>
 					    
 		 	</md-card-content>

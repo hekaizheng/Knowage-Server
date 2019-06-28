@@ -19,6 +19,7 @@ package it.eng.spagobi.api.v2;
 
 import static it.eng.spagobi.tools.glossary.util.Util.getNumberOrNull;
 
+import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -39,6 +40,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.ResponseBuilder;
 
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
@@ -48,12 +50,13 @@ import org.json.JSONObject;
 import com.jamonapi.Monitor;
 import com.jamonapi.MonitorFactory;
 
+import it.eng.knowage.commons.security.PathTraversalChecker;
 import it.eng.spagobi.api.common.AbstractDataSetResource;
-import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.commons.constants.SpagoBIConstants;
 import it.eng.spagobi.commons.dao.DAOFactory;
 import it.eng.spagobi.commons.serializer.SerializationException;
 import it.eng.spagobi.commons.serializer.SerializerFactory;
+import it.eng.spagobi.commons.utilities.SpagoBIUtilities;
 import it.eng.spagobi.commons.utilities.StringUtilities;
 import it.eng.spagobi.commons.utilities.UserUtilities;
 import it.eng.spagobi.services.rest.annotations.ManageAuthorization;
@@ -61,6 +64,7 @@ import it.eng.spagobi.services.rest.annotations.UserConstraint;
 import it.eng.spagobi.services.serialization.JsonConverter;
 import it.eng.spagobi.tools.dataset.DatasetManagementAPI;
 import it.eng.spagobi.tools.dataset.bo.AbstractJDBCDataset;
+import it.eng.spagobi.tools.dataset.bo.DataSetBasicInfo;
 import it.eng.spagobi.tools.dataset.bo.FlatDataSet;
 import it.eng.spagobi.tools.dataset.bo.IDataSet;
 import it.eng.spagobi.tools.dataset.bo.SolrDataSet;
@@ -100,7 +104,6 @@ import it.eng.spagobi.utilities.rest.RestUtilities;
 
 /**
  * @author Alessandro Daniele (alessandro.daniele@eng.it)
- *
  */
 
 @Path("/2.0/datasets")
@@ -168,6 +171,25 @@ public class DataSetResource extends AbstractDataSetResource {
 			String jsonString = JsonConverter.objectToJson(toBeReturned, toBeReturned.getClass());
 
 			return callback + "(" + jsonString + ")";
+		}
+	}
+
+	@GET
+	@Path("/basicinfo/all")
+	@Produces(MediaType.APPLICATION_JSON + "; charset=UTF-8")
+	public Response getDatasetsBasicInfo() {
+		logger.debug("IN");
+		List<DataSetBasicInfo> toReturn = new ArrayList<>();
+		IDataSetDAO dsDAO = DAOFactory.getDataSetDAO();
+
+		try {
+			toReturn = dsDAO.loadDatasetsBasicInfo();
+			return Response.ok(toReturn).build();
+		} catch (Exception e) {
+			logger.error("Error while loading the datasets basic info", e);
+			throw new SpagoBIRuntimeException("Error while loading the datasets basic info", e);
+		} finally {
+			logger.debug("OUT");
 		}
 	}
 
@@ -268,6 +290,51 @@ public class DataSetResource extends AbstractDataSetResource {
 		return super.deleteDataset(label);
 	}
 
+	@GET
+	@Path("/download/file")
+	@Produces(MediaType.APPLICATION_OCTET_STREAM)
+	public Response downloadDataSetFile(@QueryParam("fileName") String fileName, @QueryParam("type") String type) {
+		File file = null;
+		ResponseBuilder response = null;
+		try {
+			String resourcePath = SpagoBIUtilities.getResourcePath();
+			File fileDirectory = new File(resourcePath + File.separatorChar + "dataset" + File.separatorChar + "files");
+			file = new File(fileDirectory, fileName);
+
+			PathTraversalChecker.preventPathTraversalAttack(file, fileDirectory);
+
+			if (file == null || !file.exists()) {
+				logger.error("File cannot be found");
+				throw new SpagoBIRuntimeException("File [" + fileName + "] is not found");
+			}
+
+			response = Response.ok(file);
+			String mimeType = getMimeType(type);
+			if (mimeType != null) {
+				response.header("Content-Type", mimeType);
+			}
+			response.header("Content-Disposition", "attachment; fileName=" + fileName + "; fileType=" + type + "; extensionFile=" + type);
+		} catch (SpagoBIRuntimeException e) {
+			throw new SpagoBIRestServiceException(getLocale(), e);
+		} catch (Exception e) {
+			logger.error("Error while downloading Dataset file", e);
+			throw new SpagoBIRuntimeException("Error while downloading dataset file");
+		}
+		return response.build();
+	}
+
+	private String getMimeType(String type) {
+		String mimeType = "";
+		if (type.equalsIgnoreCase("XLS") || type.equalsIgnoreCase("CSV")) {
+			mimeType = "application/vnd.ms-excel";
+		} else if (type.equalsIgnoreCase("XLSX")) {
+			mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+		} else {
+			mimeType = null;
+		}
+		return mimeType;
+	}
+
 	public String getDatasetsAsPagedList(String pageStr, String itemPerPageStr, String search, Boolean seeTechnical, String ids, boolean spatialOnly) {
 
 		try {
@@ -300,6 +367,7 @@ public class DataSetResource extends AbstractDataSetResource {
 				jsonSbiDataSet.put("isRealtime", dataSet.isRealtime());
 				jsonSbiDataSet.put("isCachingSupported", dataSet.isCachingSupported());
 				jsonSbiDataSet.put("parameters", jsonIDataSet.getJSONArray("pars"));
+				jsonSbiDataSet.put("isIterable", dataSet.isIterable());
 				dataSet = dataSet instanceof VersionedDataSet ? ((VersionedDataSet) dataSet).getWrappedDataset() : dataSet;
 				if (dataSet instanceof AbstractJDBCDataset) {
 					IDataBase database = DataBaseFactory.getDataBase(dataSet.getDataSource());
@@ -324,7 +392,7 @@ public class DataSetResource extends AbstractDataSetResource {
 	}
 
 	@Override
-	protected List<Filter> getFilters(String datasetLabel, JSONObject selectionsObject, Map<String, String> columnAliasToColumnName) throws JSONException {
+	public List<Filter> getFilters(String datasetLabel, JSONObject selectionsObject, Map<String, String> columnAliasToColumnName) throws JSONException {
 		List<Filter> filters = new ArrayList<>(0);
 
 		if (selectionsObject.has(datasetLabel)) {
@@ -421,7 +489,7 @@ public class DataSetResource extends AbstractDataSetResource {
 		}
 	}
 
-	private SimpleFilter getFilter(String operatorString, JSONArray valuesJsonArray, String columns, IDataSet dataSet,
+	public SimpleFilter getFilter(String operatorString, JSONArray valuesJsonArray, String columns, IDataSet dataSet,
 			Map<String, String> columnAliasToColumnName) throws JSONException {
 		SimpleFilter filter = null;
 
@@ -471,6 +539,21 @@ public class DataSetResource extends AbstractDataSetResource {
 		return filter;
 	}
 
+	@GET
+	@Path("/preview")
+	public void openPreview() {
+		logger.debug("IN");
+		try {
+			response.setContentType(MediaType.TEXT_HTML);
+			request.getRequestDispatcher("/WEB-INF/jsp/commons/preview.jsp").forward(request, response);
+			response.flushBuffer();
+		} catch (Exception e) {
+			throw new SpagoBIRestServiceException(buildLocaleFromSession(), e);
+		} finally {
+			logger.debug("OUT");
+		}
+	}
+
 	@POST
 	@Path("/{label}/data")
 	@Produces(MediaType.APPLICATION_JSON)
@@ -486,6 +569,7 @@ public class DataSetResource extends AbstractDataSetResource {
 			String likeSelections = null;
 			String aggregations = null;
 			String summaryRow = null;
+			String options = null;
 
 			if (StringUtilities.isNotEmpty(body)) {
 				JSONObject jsonBody = new JSONObject(body);
@@ -504,10 +588,119 @@ public class DataSetResource extends AbstractDataSetResource {
 
 				JSONObject jsonSummaryRow = jsonBody.optJSONObject("summaryRow");
 				summaryRow = jsonSummaryRow != null ? jsonSummaryRow.toString() : null;
+
+				JSONObject jsonOptions = jsonBody.optJSONObject("options");
+				options = jsonOptions != null ? jsonOptions.toString() : null;
 			}
 
 			timing.stop();
-			return getDataStore(label, parameters, selections, likeSelections, maxRowCount, aggregations, summaryRow, offset, fetchSize, isNearRealtime);
+			return getDataStore(label, parameters, selections, likeSelections, maxRowCount, aggregations, summaryRow, offset, fetchSize, isNearRealtime,
+					options);
+		} catch (JSONException e) {
+			throw new SpagoBIRestServiceException(buildLocaleFromSession(), e);
+		}
+	}
+
+	@POST
+	@Path("/{label}/preview")
+	@Produces(MediaType.APPLICATION_JSON)
+	@UserConstraint(functionalities = { SpagoBIConstants.SELF_SERVICE_DATASET_MANAGEMENT })
+	public String getDataStorePreview(@PathParam("label") String label, String body) {
+		try {
+			Monitor timing = MonitorFactory.start("Knowage.DataSetResource.getDataStorePreview:parseInputs");
+
+			String aggregations = null;
+			String parameters = null;
+			String likeSelections = null;
+			int start = -1;
+			int limit = -1;
+
+			if (StringUtilities.isNotEmpty(body)) {
+				JSONObject jsonBody = new JSONObject(body);
+
+				if (jsonBody.has("start")) {
+					start = jsonBody.getInt("start");
+				}
+
+				if (jsonBody.has("limit")) {
+					limit = jsonBody.getInt("limit");
+				}
+
+				JSONArray jsonFilters = jsonBody.optJSONArray("filters");
+				if (jsonFilters != null && jsonFilters.length() > 0) {
+					JSONObject jsonLikeSelections = new JSONObject();
+
+					for (int i = 0; i < jsonFilters.length(); i++) {
+						JSONObject jsonFilter = jsonFilters.getJSONObject(i);
+						jsonLikeSelections.put(jsonFilter.getString("column"), jsonFilter.get("value"));
+					}
+
+					likeSelections = new JSONObject().put(label, jsonLikeSelections).toString();
+				}
+
+				String sortingColumn = null;
+				String sortingType = null;
+				if (jsonBody.has("sorting")) {
+					JSONObject jsonSorting = jsonBody.optJSONObject("sorting");
+					sortingColumn = jsonSorting.getString("column");
+					sortingType = jsonSorting.getString("order");
+				}
+
+				JSONArray jsonMeasures = new JSONArray();
+				JSONArray jsonCategories = new JSONArray();
+
+				JSONObject jsonDataSets = new JSONObject(getDataSets(null, null, true, null, null, label, true, null, false));
+				JSONObject jsonDataSet = jsonDataSets.getJSONArray("item").getJSONObject(0);
+				JSONArray jsonFields = jsonDataSet.getJSONObject("metadata").getJSONArray("fieldsMeta");
+				for (int i = 0; i < jsonFields.length(); i++) {
+					JSONObject jsonField = jsonFields.getJSONObject(i);
+					JSONObject json = new JSONObject();
+					String alias = jsonField.getString("alias");
+					json.put("id", alias);
+					json.put("alias", alias);
+					json.put("columnName", alias);
+					json.put("orderType", alias.equals(sortingColumn) ? sortingType : "");
+					json.put("orderColumn", alias);
+					json.put("funct", "NONE");
+
+					if ("ATTRIBUTE".equals(jsonField.getString("fieldType"))) {
+						jsonCategories.put(json);
+					} else {
+						jsonMeasures.put(json);
+					}
+				}
+
+				JSONObject jsonAggregations = new JSONObject();
+				jsonAggregations.put("measures", jsonMeasures);
+				jsonAggregations.put("categories", jsonCategories);
+				aggregations = jsonAggregations.toString();
+
+				JSONArray jsonParameters = jsonDataSet.getJSONArray("parameters");
+				JSONArray jsonPars = jsonBody.optJSONArray("pars");
+				if (jsonParameters != null) {
+					JSONObject json = new JSONObject();
+					for (int i = 0; i < jsonParameters.length(); i++) {
+						JSONObject jsonParameter = jsonParameters.getJSONObject(i);
+						String columnName = jsonParameter.getString("name");
+						json.put(columnName, jsonParameter.get("defaultValue"));
+						if (jsonPars != null) {
+							for (int j = 0; j < jsonPars.length(); j++) {
+								JSONObject jsonPar = jsonPars.getJSONObject(j);
+								if (columnName.equals(jsonPar.getString("name"))) {
+									if (jsonPar.opt("value") != null && jsonPar.opt("value") != "") {
+										json.put(columnName, jsonPar.get("value"));
+										break;
+									}
+								}
+							}
+						}
+					}
+					parameters = json.toString();
+				}
+			}
+
+			timing.stop();
+			return getDataStore(label, parameters, null, likeSelections, -1, aggregations, null, start, limit, true);
 		} catch (JSONException e) {
 			throw new SpagoBIRestServiceException(buildLocaleFromSession(), e);
 		}
@@ -549,6 +742,16 @@ public class DataSetResource extends AbstractDataSetResource {
 		CockpitJSONDataWriter dataWriter = new CockpitJSONDataWriter(getDataSetWriterProperties());
 		dataWriter.setLocale(buildLocaleFromSession());
 		return dataWriter;
+	}
+
+	/**
+	 * Dataset-Tags: Subresource
+	 */
+	@Path("{dsId}/dstags")
+	@Produces(MediaType.APPLICATION_JSON)
+	public DatasetTagsResource getDatasetTagsResource(@PathParam("dsId") Integer dsId) {
+		logger.debug("Getting DatasetTagsResource Instace...");
+		return new DatasetTagsResource();
 	}
 
 }

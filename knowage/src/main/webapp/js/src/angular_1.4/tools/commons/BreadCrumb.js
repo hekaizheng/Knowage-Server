@@ -7,13 +7,14 @@
 angular.module('bread_crumb', ['ngMaterial'])
 .directive('breadCrumb', function() {
 	return {
-//		templateUrl: '/knowage/js/src/angular_1.4/tools/commons/templates/bread_crumb.html',
 		templateUrl: currentScriptPath + 'templates/bread_crumb.html',
 		controller: breadCrumbControllerFunction,
+		replace: true,
 		scope: {
 			ngModel:'=',
 			itemName:"@",
 			id:"@",
+			homepage: '=?',
 			selectedIndex:'=?',
 			selectedItem:'=?',
 			moveToCallback:'&?', //function callback to call when change item
@@ -53,6 +54,10 @@ angular.module('bread_crumb', ['ngMaterial'])
 function breadCrumbControllerFunction($scope){
 	var s=$scope;
 	
+	s.goToHome = function() {
+		//TODO add link to the homepage
+		return;
+	}
 	s.canGoBack=function(item,index){
 		if($scope.disableGoBack==true && s.selectedIndex!=undefined && index<s.selectedIndex){
 			return false;

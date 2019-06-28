@@ -3,6 +3,8 @@
 <%@page import="it.eng.spagobi.tenant.TenantManager"%>
 <%@page import="it.eng.spagobi.commons.SingletonConfig"%>
 <%@page import="it.eng.spagobi.commons.constants.SpagoBIConstants"%>
+<%@page import="it.eng.knowage.commons.utilities.urls.UrlBuilder"%>
+
 <script>
 var sbiM=angular.module('sbiModule',["toastr","ngSanitize"]);
 
@@ -10,7 +12,10 @@ var sbiM=angular.module('sbiModule',["toastr","ngSanitize"]);
 // 	$mdThemingProvider.theme('default').primaryPalette('grey').accentPalette('blue-grey');
 // });
 <%	
-String contextNameForEngineComposition = GeneralUtilities.getSpagoBiContext().replaceAll("^/", "");
+	String contextNameForEngineComposition = GeneralUtilities.getSpagoBiContext().replaceAll("^/", "");
+	String spagoBiContext = GeneralUtilities.getSpagoBiContext();	//  /knowage
+	UrlBuilder dynamicUrlBuilder = new UrlBuilder(spagoBiContext);
+	String dynamicResourcesBasePath = dynamicUrlBuilder.getDynamicResorucesBasePath();  //  /knowage/js/src/
 %>
 sbiM.factory('sbiModule_config',function(){ 
 	return {
@@ -46,7 +51,7 @@ sbiM.factory('sbiModule_config',function(){
         isStatePersistenceEnabled: <%= SingletonConfig.getInstance().getConfigValue("SPAGOBI.SESSION_PARAMETERS_MANAGER.enabled")  %>,
         layerFileMaxSize: '<%= GeneralUtilities.getGisLayerFileMaxSize() %>',
         workspaceShowGrid: '<%= SingletonConfig.getInstance().getConfigValue("KNOWAGE.WORKSPACE_SHOW_GRID") %>',
-                
+        dynamicResourcesBasePath: '<%= dynamicResourcesBasePath %>',        
         
 		<%-- <%if(parametersStatePersistenceEnabled != null) {%> --%>
 		<%-- isParametersStatePersistenceEnabled: <%= Boolean.valueOf(parametersStatePersistenceEnabled) %>, --%>
@@ -626,15 +631,13 @@ sbiM.service('sbiModule_restServices', function($http, $q, sbiModule_translate, 
 				    	}
 				    },
 				    disableParentScroll: true,
-				    template: '<md-card>'+
-				    	 		'<md-card-title style="   min-width: 300px; max-height: 400px;max-width: 600px; overflow: auto;">'+
-			          			'	<md-card-title-text>'+
-			            		'		<span class="md-headline">{{title}}</span>'+
-			            		'		<span class="md-subhead"  ng-bind-html="text"> </span>'+
-			          			'	</md-card-title-text>'+
+				    template: '<md-card class="kn-error-popup">'+
+				    	 		'<md-card-title>'+
+			            		'	<span class="md-headline">{{title}}</span>'+
 			          			'</md-card-title>'+
+			          			'<md-card-content><p ng-bind-html="text"></p></md-card-content>'+
 			          			'<md-card-actions layout="row" layout-align="end center">'+
-			                   	 '<md-button ng-click="closeDialog()">{{ok}}</md-button>'+
+			                   	 '<md-button class="md-raised md-primary" ng-click="closeDialog()">{{ok}}</md-button>'+
 			                  '</md-card-actions>'+
 			          		'</md-card>',
 				    hasBackdrop: true,
@@ -679,6 +682,39 @@ sbiM.service('multipartForm',['$http', 'sbiModule_config',function($http, sbiMod
 	}
 	
 }]);
+
+
+sbiM.service('sbiModule_urlDeserializator', function(){
+
+ 	var urlSer = {};
+
+ 	urlSer.deserializeParameters = function(urlMenuParameters) {
+		urlSer.menuParams = {};
+		var menuParameters = urlMenuParameters;
+		var splittedMenuParams = menuParameters=='null' || menuParameters==''? [] : menuParameters.split("&");
+
+ 		for(var i=0;i<splittedMenuParams.length;i++){
+			var splittedItem=splittedMenuParams[i].split("=");
+			if(splittedItem[1]==undefined){throw true;}
+			if(urlSer.menuParams.hasOwnProperty(splittedItem[0])) {
+				var arrayOfValues = [];
+				if(Array.isArray(urlSer.menuParams[splittedItem[0]])) {
+					arrayOfValues = urlSer.menuParams[splittedItem[0]];					
+				} else {
+					arrayOfValues.push(urlSer.menuParams[splittedItem[0]]);
+				}				
+				arrayOfValues.push(splittedItem[1]);
+				urlSer.menuParams[splittedItem[0]]=arrayOfValues;
+			} else {
+				urlSer.menuParams[splittedItem[0]]=splittedItem[1];
+			}
+		}
+		return urlSer.menuParams;
+	}
+
+ 	return urlSer;
+
+ });
 
 
 sbiM.service('sbiModule_i18n', function(sbiModule_config, sbiModule_restServices, $q) {
@@ -847,7 +883,7 @@ sbiM.service('sbiModule_helpOnLine', function(sbiModule_config,$mdDialog,sbiModu
 	      	locals:{ 
 	    	  	translate:sbiModule_translate
     		},
-	      	templateUrl : sbiModule_config.contextName + '/js/src/angular_1.4/tools/documentexecution/templates/helpOnLineDialogTemplate.jsp'
+	      	templateUrl : sbiModule_config.dynamicResourcesBasePath + '/angular_1.4/tools/documentexecution/templates/helpOnLineDialogTemplate.jsp'
 	    });
 	};
 	
@@ -864,6 +900,250 @@ sbiM.service('sbiModule_helpOnLine', function(sbiModule_config,$mdDialog,sbiModu
 		});
 	};
 });
+sbiM.service('sbiModule_urlBuilderService',["$httpParamSerializer",function($httpParamSerializer) {
+
+    var parameters = [];
+    var httpParamSerializer = $httpParamSerializer;
+	var baseUrl = "";
+	var getQueryString = function(){
+			var queryString = "";
+      for(var i = 0;i < parameters.length;i++){
+      	var params = getQueryStringFromObj(parameters[i]);
+        queryString = queryString + "&" + params;
+      }
+			return queryString;
+	}
+
+    var getQueryStringFromObj = function(obj){
+    	return httpParamSerializer(obj)
+    }
+
+    var clearParameters = function(){
+    	parameters.length = 0;
+    }
+
+    var isObject = function(obj){
+		return  typeof obj === 'object' && obj.constructor === Object;
+	}
+
+    var isEmpty = function(obj){
+    	return Object.keys(obj).length === 0;
+    }
+
+    var isNull = function(obj){
+    	return obj === null || obj === undefined;
+    }
+
+    var isValid = function(value){
+    	return !isNull(value) && isObject(value) && !isEmpty(value)
+    }
+	
+    var isArrayEmpty = function(array){
+    	return array.length === 0;
+    }
+    var hasUrlParamameters = function(url){   	
+    	return url.includes("?")
+    }
+    
+    var buildUrlWithExistingParams = function(){	
+    	var url;
+    	return url = baseUrl + getQueryString();   	
+    }
+    
+    var buildUrlWithoutExistingParams = function(){
+     var url;
+    	if(!isArrayEmpty(parameters)){
+    		return url = baseUrl + "?" + getQueryString().substr(1);
+    	}else
+    		return baseUrl;
+    }
+    
+		return {
+
+			setBaseUrl:function(url){
+					baseUrl = url;
+			},
+
+			addQueryParams:function(paramsObj){
+				if(isValid(paramsObj)){
+					parameters.push(paramsObj)
+				}
+			},
+
+			build:function(){				
+			
+				if(hasUrlParamameters(baseUrl)){
+					var url = buildUrlWithExistingParams();
+				}else{
+					var url = buildUrlWithoutExistingParams();
+				}
+				
+				clearParameters();
+				return url;
+			}
+
+		}
+}] );
+sbiM.service('windowCommunicationService',['messageHandlerValidatorService',function(messageHandlerValidatorService){
+
+	
+ 
+	var communicatorUtils = new CommunicatorUtils();
+	var listenerManager = new ListenerManager();
+	var messageManager = new MessageManager(messageHandlerValidatorService);
+	 
+	var eventLisneter = function(event){
+		 
+	 	if(communicatorUtils.isConnectionRequest(event)){
+	 		listenerManager.addListener(event.source)	
+	 	}else if(communicatorUtils.isConnectionClosing(event)){
+	 		listenerManager.removeListener(event.source)
+	 	}else{	
+	 		messageManager.handleMessage(event)
+	 	}
+	 	
+		
+	} 
+	
+	 var init = function(){
+		 
+		 if(communicatorUtils.hasParent()){
+			 messageManager.sendConnectionRequest();
+			 listenerManager.addListener(window.parent);
+		 }
+		 window.addEventListener("message",eventLisneter, false);
+		 window.addEventListener("beforeunload",messageManager.unsubscribe, false);	
+	 }
+	 
+	 init();
+	 return {
+		 	
+		removeMessageHandler:function(messageHandler){messageManager.removeMessageHandler(messageHandler)},
+		sendMessage:function(message){messageManager.broadcastMessage(message,listenerManager.listeners)},
+	 	addMessageHandler:function(messageHandler){messageManager.addMessageHandler(messageHandler)}
+	 }
+	 
+	
+	 
+
+}])
+
+function CommunicatorUtils(){
+	
+	this.hasParent = function(){
+		 return window !== window.parent;
+	 }
+	
+	this.isConnectionRequest = function(event){
+		 return event.data === "handshake";
+	 }
+	
+	this.isConnectionClosing = function(event){
+		 return event.data === "unsubscribe";
+	 }
+}
+
+function ListenerManager(){
+	
+	this.listeners = [];
+	
+	this.addListener = function(listener){
+		 this.listeners.push(listener)
+		 this.removeNonExistingListeners();
+	 }
+	 
+	this.removeListener = function(listener){
+		 for(var i = 0;i<this.listeners.length;i++){
+	 			if(listener === this.listeners[i]){
+	 				this.listeners.splice(i,1);
+	 			}
+		 }
+	 }
+	 
+	this.removeNonExistingListeners = function(){
+		 for(var i = 0;i<this.listeners.length;i++){
+	 			if(!this.listeners[i].parent){
+	 				this.listeners.splice(i,1);
+	 			}
+		 }
+	 }
+}
+
+function MessageManager(messageHandlerValidator){
+	
+	this.messageHandlers = [];
+	this.messageHandlerValidator = messageHandlerValidator;
+	
+	this.sendConnectionRequest = function(){
+		 window.parent.postMessage("handshake","*");
+	 }
+	 
+	 this.unsubscribe = function(){
+		 window.parent.postMessage("unsubscribe","*");
+	 }
+	 
+	 this.addMessageHandler = function(messageHandler){
+			if(this.messageHandlerValidator.isValid(messageHandler)){
+				this.messageHandlers.push(messageHandler)
+			}else{
+				
+				console.error("valid messageHandler must have function handleMessage(message)")
+				console.error(messageHandler)
+			}
+			
+		}
+	 
+	 this.handleMessage = function(event){
+		 for(var i = 0;i<this.messageHandlers.length;i++){
+	 			this.messageHandlers[i].handleMessage(event.data);
+		 }
+	 }
+	 
+	this.broadcastMessage = function(message,listeners){
+		 for(var i =0;i<listeners.length;i++){
+			 listeners[i].postMessage(message,"*");
+			}
+	 }
+	
+	this.removeMessageHandler = function(messageHandler){
+		 for(var i = 0;i<this.messageHandlers.length;i++){
+	 			if(messageHandler === this.messageHandlers[i]){
+	 				this.messageHandlers.splice(i,1);
+	 			}
+		 }
+	}
+	 
+	 
+	
+}
+
+sbiM.service('messageHandlerValidatorService',function(){
+	var isNull = function(value){
+		 return value === null || value === undefined;
+	 }
+	 
+	 var isObject = function(obj){
+			return  typeof obj === 'object' && obj.constructor === Object;
+	}
+	 
+	 var isFunction = function(func){
+			return  typeof func === 'function';
+	}
+	 
+	 var hasHandleMessageFunction = function(messageHandler){
+		 return !isNull(messageHandler.handleMessage) && isFunction(messageHandler.handleMessage);
+	 }
+	 
+	 var isValidMessageHandler = function(messageHandler){
+		 return !isNull(messageHandler) && isObject(messageHandler) && hasHandleMessageFunction(messageHandler)
+	 }
+	 
+	 return{
+		 isValid:isValidMessageHandler
+	 }
+
+	})
+
 </script>
 
 

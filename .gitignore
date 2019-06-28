@@ -52,6 +52,9 @@ Temporary Items
 .project
 .gitignore
 .eclipse
+.metadata
+
+Servers
 
 # IntelliJ Idea files
 .idea/
@@ -65,9 +68,9 @@ target/
 *.ear
 *.logs
 
-# ant folders
-ant-build/
-dist/
+# npm/yarn node Modules
+node_modules/
+package-lock.json
 
 # zanata folder
 .zanata-cache/

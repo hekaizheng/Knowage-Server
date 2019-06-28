@@ -21,10 +21,12 @@ import java.util.List;
 import java.util.Set;
 
 import org.hibernate.Session;
+import org.json.JSONObject;
 
 import it.eng.spagobi.commons.bo.Domain;
 import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.commons.dao.ISpagoBIDao;
+import it.eng.spagobi.tools.dataset.bo.DataSetBasicInfo;
 import it.eng.spagobi.tools.dataset.bo.IDataSet;
 import it.eng.spagobi.tools.dataset.metadata.SbiDataSet;
 
@@ -69,7 +71,9 @@ public interface IDataSetDAO extends ISpagoBIDao {
 
 	public List<IDataSet> loadMyDataDataSets(UserProfile owner);
 
-	public List<IDataSet> loadMyDataFederatedDataSets(UserProfile owner);
+	public List<DataSetBasicInfo> loadFederatedDataSetsByFederatoinId(Integer id);
+
+	public List<DataSetBasicInfo> loadDatasetsBasicInfoForLov();
 
 	public List<IDataSet> loadDataSets(String owner, Boolean includeOwned, Boolean includePublic, String scope, String type, Set<Domain> categoryList,
 			String implementation, Boolean showDerivedDatasets);
@@ -77,6 +81,8 @@ public interface IDataSetDAO extends ISpagoBIDao {
 	public List<IDataSet> loadDataSets();
 
 	public List<IDataSet> loadDataSetOlderVersions(Integer dsId);
+
+	public List<IDataSet> loadDatasetsByTags(UserProfile user, List<Integer> tagIds, String type);
 
 	// ========================================================================================
 	// CEATE operations (Crud)
@@ -89,6 +95,8 @@ public interface IDataSetDAO extends ISpagoBIDao {
 	// ???
 	// ========================================================================================
 
+	public List<DataSetBasicInfo> loadDatasetsBasicInfo();
+
 	public List<IDataSet> loadFilteredDatasetList(String hsql, Integer offset, Integer fetchSize);
 
 	public List<IDataSet> loadPagedDatasetList(Integer offset, Integer fetchSize);
@@ -96,6 +104,9 @@ public interface IDataSetDAO extends ISpagoBIDao {
 	public List<IDataSet> loadFilteredDatasetList(String hsql, Integer offset, Integer fetchSize, String owner);
 
 	public List<IDataSet> loadPagedDatasetList(Integer offset, Integer fetchSize, String owner);
+
+	public List<IDataSet> loadFilteredDatasetList(Integer offset, Integer fetchSize, String owner, JSONObject filters, JSONObject ordering,
+			List<Integer> tagIds);
 
 	/**
 	 * @deprecated
@@ -107,7 +118,7 @@ public interface IDataSetDAO extends ISpagoBIDao {
 
 	public Integer countDatasets();
 
-	public Integer countDatasetsSearch(String search);
+	public Integer countDatasetsSearch(String search, List<Integer> tagIds);
 
 	public boolean hasBIObjAssociated(String dsId);
 

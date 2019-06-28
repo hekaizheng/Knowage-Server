@@ -1,22 +1,39 @@
-/**
- * JS file for managing LOVs management catalog panel.
- * 
- * @author: danristo (danilo.ristovski@mht.net)
- */
+/*
+Knowage, Open Source Business Intelligence suite
+Copyright (C) 2016 Engineering Ingegneria Informatica S.p.A.
+
+Knowage is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+Knowage is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+(function() {
+
+agGrid.initialiseAgGridWithAngular1(angular);
 
 var app = angular.module
 (
 	'lovsManagementModule',
-	
+
 	[
 	 	'ngMaterial',
 	 	'angular_list',
-	 	'angular_table',	 	
+	 	'angular_table',
 	 	'sbiModule',
 	 	'angular-list-detail',
 	 	'ui.codemirror',
 	 	'ui.tree',
-	 	'ab-base64'
+	 	'ab-base64',
+	 	'knTable',
+	 	'agGrid'
 	 ]
 );
 
@@ -28,7 +45,7 @@ app.config(['$mdThemingProvider', function($mdThemingProvider) {
 app.controller
 (
 	'lovsManagementController',
-	
+
 	[
 	 	"sbiModule_translate",
 	 	"sbiModule_restServices",
@@ -42,11 +59,12 @@ app.controller
 	 	"base64",
 	 	"sbiModule_device",
 	 	"$filter",
+	 	"$mdPanel",
 	 	lovsManagementFunction
 	 ]
 );
 
-function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $scope, $mdDialog, $mdToast,sbiModule_messaging,sbiModule_config,$timeout,sbiModule_user,base64,sbiModule_device,$filter)
+function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $scope, $mdDialog, $mdToast,sbiModule_messaging,sbiModule_config,$timeout,sbiModule_user,base64,sbiModule_device,$filter, $mdPanel)
 {
 	/**
 	 * =====================
@@ -82,10 +100,13 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 	};
 	$scope.selectedFIXLov = {};
 	$scope.selectedJavaClass = {
-		name : ""	
+		name : ""
 	};
 	$scope.selectedDataset = {
-		id : ""	
+		id : "",
+		label: "",
+		name: "",
+		description: ""
 	};
 	$scope.lovItemEnum ={
 		"SCRIPT" : "SCRIPT",
@@ -95,21 +116,21 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 		"DATASET" : "DATASET"
 	};
 	var lovTypeEnum = {
-		"MAIN": undefined,	
+		"MAIN": undefined,
 		"SCRIPT":"script",
 		"QUERY":"query",
 		"DATASET":"dataset"
-	}; 
+	};
 	var lovProviderEnum ={
 			"SCRIPT" : "SCRIPTLOV",
 			"QUERY" : "QUERY",
 			"FIX_LOV" : "FIXLISTLOV",
 			"JAVA_CLASS" : "JAVACLASSLOV",
-			"DATASET" : "DATASET"	
+			"DATASET" : "DATASET"
 	};
 	$scope.paginationObj ={
 		"paginationStart" : 0,
-		"paginationLimit" : 20,	
+		"paginationLimit" : 20,
 		"paginationEnd" : 20
 	};
 	$scope.dependenciesList = [];
@@ -119,7 +140,7 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 		   label:"Name",
            name:"name",
            size: "200px",
-           hideTooltip:true,                   
+           hideTooltip:true,
        },
        {
 		   label:"Value",
@@ -127,7 +148,7 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
            hideTooltip:true,
            transformer:function(){
                return " <md-checkbox ng-checked=scopeFunctions.getItem(row,'value') ng-click = scopeFunctions.setItem(row,'value')  aria-label='buttonValue'></md-checkbox>";
-           }                                    
+           }
        },
        {
 		   label:"Description",
@@ -135,7 +156,7 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
            hideTooltip:true,
            transformer:function(){
                return " <md-checkbox ng-checked=scopeFunctions.getItem(row,'description') ng-click = scopeFunctions.setItem(row,'description') aria-label='buttonDescription'></md-checkbox>";
-           }                                    
+           }
        },
        {
 		   label:"Visible",
@@ -143,28 +164,28 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
            hideTooltip:true,
            transformer:function(){
                return " <md-checkbox ng-checked=scopeFunctions.getItem(row,'visible') ng-click = scopeFunctions.setItem(row,'visible') aria-label='buttonVisible'></md-checkbox>";
-           }                                    
-       }                     
+           }
+       }
 	    ]
-	
 
-	
-	
+
+
+
 	$scope.testLovTreeRightColumns = [
 	                  	   {
 	                  		   label:"Level",
 	                             name:"level",
 	                             size: "200px",
-	                             hideTooltip:true,                   
+	                             hideTooltip:true,
 	                         },
-	                         
+
 	                         {
 	                  		   label:"Value",
 	                             name:"value",
 	                             hideTooltip:true,
 	                             transformer: function() {
 	                 				return '<md-select ng-model=row.value class="noMargin"><md-option ng-repeat="col in scopeFunctions.treeOptions()" value="{{col.name}}">{{col.name}}</md-option></md-select>';
-	                 			}           
+	                 			}
 	                         },
 	                         {
 	                  		   label:"Description",
@@ -172,13 +193,13 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 	                             hideTooltip:true,
 	                             transformer: function() {
 		                 				return '<md-select ng-model=row.description class="noMargin"><md-option ng-repeat="col in scopeFunctions.treeOptions()" value="{{col.name}}">{{col.name}}</md-option></md-select>';
-		                 			}                         
-	                         }                     
+		                 			}
+	                         }
 	                  	    ]
-	
-	
+
+
 	$scope.TreeListType = [
-	  
+
 	   {
 		   "name": "Simple",
 		   "value" : "simple"
@@ -191,9 +212,77 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 		   "name": "Tree selectable inner nodes",
 		   "value" : "treeinner"
 	   }
-	                       
-	                       ]
-	
+
+    ]
+
+	var addDataset = function() {
+		var config = {
+				attachTo: angular.element(document.body),
+				templateUrl: sbiModule_config.dynamicResourcesBasePath +'/angular_1.4/tools/catalogues/templates/lovAddDataset.html',
+				position: $mdPanel.newPanelPosition().absolute().center(),
+				fullscreen: true,
+				locals: {listOfDatasets: $scope.listOfDatasets, saveDatasetFn: $scope.saveDataset},
+				controller: addDatasetController,
+				clickOutsideToClose: false,
+				escapeToClose: true,
+		};
+
+		$mdPanel.open(config);
+	}
+
+	function addDatasetController($scope, mdPanelRef, sbiModule_translate, listOfDatasets, saveDatasetFn) {
+		$scope.translate = sbiModule_translate;
+		$scope.listOfDatasets = listOfDatasets;
+
+		$scope.datasetSearchText = '';
+
+		$scope.filterDataset = function() {
+			var tempDatasetList = $filter('filter')($scope.listOfDatasets, $scope.datasetSearchText);
+			$scope.datasetGrid.api.setRowData(tempDatasetList);
+		}
+
+		$scope.gridDatasetColumns = [
+			{"headerName": sbiModule_translate.load('sbi.ds.label'),"field":"label"},
+			{"headerName": sbiModule_translate.load('sbi.ds.name'),"field":"name"},
+			{"headerName": sbiModule_translate.load('sbi.ds.description'),"field":"description"},
+			{"headerName": sbiModule_translate.load('sbi.ds.owner'),"field":"owner"},
+			{"headerName": sbiModule_translate.load('sbi.ds.scope'),"field":"scope"}
+		];
+
+		$scope.datasetGrid = {
+		        enableColResize: false,
+		        enableFilter: true,
+		        enableSorting: true,
+		        pagination: true,
+		        paginationAutoPageSize: true,
+		        rowSelection: 'single',
+		        rowMultiSelectWithClick: 'single',
+		        onGridSizeChanged: resizeColumns,
+		        columnDefs: $scope.gridDatasetColumns,
+		        rowData: $scope.listOfDatasets
+		};
+
+		function resizeColumns(){
+			$scope.datasetGrid.api.sizeColumnsToFit();
+		}
+
+		$scope.closeDialog = function() {
+			mdPanelRef.close();
+			$scope.$destroy();
+		}
+
+		$scope.saveDataset = function() {
+			var selectedDs = $scope.datasetGrid.api.getSelectedRows()[0];
+			saveDatasetFn(selectedDs);
+			mdPanelRef.close();
+			$scope.$destroy();
+		}
+	}
+
+	$scope.saveDataset = function(dataSetObject) {
+		$scope.selectedDataset = dataSetObject;
+	}
+
 	$scope.formatedVisibleValues = [];
 	$scope.formatedInvisibleValues = [];
 	$scope.cmOption = {
@@ -205,7 +294,7 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 				theme:"eclipse",
 				lineNumbers: true,
 			     onLoad : function(_cm){
-			       
+
 			       // HACK to have the codemirror instance in the scope...
 			       $scope.modeChanged = function(type){
 			        if(type=='ECMAScript'){
@@ -217,9 +306,9 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 			     }
 			   };
 
-	
+
 	/**
-	 * Speed menu for handling the deleting action on one 
+	 * Speed menu for handling the deleting action on one
 	 * particular LOV item.
 	 */
 	$scope.lovsManagementSpeedMenu= [
@@ -228,31 +317,31 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
                             icon:'fa fa-trash-o',
                             color:'#a3a5a6',
                             action:function(item,event){
-                                
+
                             	$scope.confirmDelete(item,event);
                             }
                          }
                         ];
-	
+
 	$scope.treeSpeedMenu= [
 	                                 {
 	                                    label:sbiModule_translate.load("sbi.generic.delete"),
 	                                    icon:'fa fa-trash-o',
 	                                    color:'#a3a5a6',
 	                                    action:function(item,event){
-	                                        
+
 	                                    	deleteTreeLevel(item);
 	                                    }
 	                                 }
 	                                ];
-	
+
 	$scope.fixLovSpeedMenu= [
 	                                 {
 	                                    label:sbiModule_translate.load("sbi.generic.delete"),
 	                                    icon:'fa fa-trash-o',
 	                                    color:'#a3a5a6',
 	                                    action:function(item,event){
-	                                        
+
 	                                    	$scope.confirmDelete(item,event);
 	                                    }
 	                                 },
@@ -261,21 +350,21 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 		                                    icon:'fa fa-arrow-up',
 		                                    color:'#a3a5a6',
 		                                    action:function(item,event){
-		                                        
+
 		                                    	$scope.moveFixLovUp(item,event);
 		                                    },
 		                                    visible:function(row){
 		                                    	return checkArrowVisibility(row,'up');
 		                                    }
-		                                    
-	                                 
+
+
 		                             },
 		                             {
 		                                    label:sbiModule_translate.load("sbi.behavioural.lov.fixlov.down"),
 		                                    icon:'fa fa-arrow-down',
 		                                    color:'#a3a5a6',
 		                                    action:function(item,event){
-		                                        
+
 		                                    	$scope.moveFixLovDown(item,event);
 		                                    },
 		                                    visible:function(row){
@@ -283,9 +372,13 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 		                                    }
 		                             }
 	                                ];
-	
-	
-	
+
+
+	$scope.lovTableColumns = [{"label":"Label","name":"label","type":"text"},{"label":"Description","name":"description","type":"text"},{"label":"Type","name":"itypeCd","type":"text"},
+		{"label":sbiModule_translate.load("sbi.generic.delete"),"name":sbiModule_translate.load("sbi.generic.delete"),"type":"buttons","buttons" :[
+			{"icon":"fa fa-trash-o", "action" : function(item,event){$scope.confirmDelete(item,event)}}]}];
+
+
 	$scope.confirm = $mdDialog
     .confirm()
     .title(sbiModule_translate.load("sbi.catalogues.generic.modify"))
@@ -295,7 +388,7 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
             .ariaLabel('toast').ok(
                     sbiModule_translate.load("sbi.general.continue")).cancel(
                             sbiModule_translate.load("sbi.general.cancel"));
-	
+
 	$scope.confirmDelete = function(item,ev) {
 		console.log(item);
 	    var confirm = $mdDialog.confirm()
@@ -312,7 +405,7 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 	    		deleteFixedLovItem(item);
 	    	}
 	    }, function() {
-	
+
 	    });
 	  };
 	/**
@@ -320,50 +413,49 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 	 * ===== Functions =====
 	 * =====================
 	 */
-	
+
 	angular.element(document).ready(function () { // on page load function
 		$scope.getAllLovs();
 		$scope.getInputTypes();
 		$scope.getScriptTypes();
 		$scope.getDatasources();
-		$scope.getDatasets();
     });
-	
+
 	$scope.setDirty=function()
-	{ 
+	{
 		  $scope.dirtyForm=true;
 	}
-	
+
 	/**
-	 * When clicking on plus button on the left panel, this function 
-	 * will be called and we should enable showing of the right panel 
-	 * on the main page for LOVs management (variable "showMe" will 
-	 * provide this functionality).	 * 
+	 * When clicking on plus button on the left panel, this function
+	 * will be called and we should enable showing of the right panel
+	 * on the main page for LOVs management (variable "showMe" will
+	 * provide this functionality).	 *
 	 * @author: danristo (danilo.ristovski@mht.net)
 	 */
 	$scope.createLov = function()
 	{
 		 if($scope.dirtyForm){
 			   $mdDialog.show($scope.confirm).then(function(){
-				$scope.dirtyForm=false;   
+				$scope.dirtyForm=false;
 				$scope.selectedLov = {};
 				$scope.listForFixLov = [];
 				$scope.showMe = true;
 				$scope.enableTest = false;
 			    $scope.label = "";
-			           
+
 			   },function(){
-			    
+
 				   $scope.showMe = true;
 			   });
-			   
+
 			  }else{
-			 
+
 			  $scope.selectedLov = {};
 			  $scope.showMe = true;
 			  $scope.listForFixLov = [];
 			  $scope.enableTest = false;
-			  
+
 			  }
 	}
 	/**
@@ -371,60 +463,60 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 	 * from combobox
 	 * @author: spetrovic (Stefan.Petrovic@mht.net)
 	 */
-	
+
 	$scope.changeLovType = function(item) {
-		
+
 		var propName = item;
 		var prop = lovProviderEnum[propName];
-		
+
 		switch (item) {
 		case $scope.lovItemEnum.SCRIPT:
 			$scope.toolbarTitle = sbiModule_translate.load("sbi.behavioural.lov.details.scriptWizard");
 			$scope.infoTitle= sbiModule_translate.load("sbi.behavioural.lov.info.syntax")
 			cleanSelections();
-			
+
 			break;
 		case $scope.lovItemEnum.QUERY:
 			$scope.toolbarTitle = sbiModule_translate.load("sbi.behavioural.lov.details.queryWizard");
 			$scope.infoTitle= sbiModule_translate.load("sbi.behavioural.lov.info.syntax")
 			cleanSelections();
-			
+
 			break;
 		case $scope.lovItemEnum.FIX_LOV:
 			$scope.toolbarTitle = sbiModule_translate.load("sbi.behavioural.lov.details.fixedListWizard");
 			$scope.infoTitle= sbiModule_translate.load("sbi.behavioural.lov.info.rules")
 			cleanSelections();
-			
-			break;	
+
+			break;
 		case $scope.lovItemEnum.JAVA_CLASS:
 			$scope.toolbarTitle = sbiModule_translate.load("sbi.behavioural.lov.details.javaClassWizard");
 			$scope.infoTitle= sbiModule_translate.load("sbi.behavioural.lov.info.rules")
 			cleanSelections();
-			
+
 			break;
 		case $scope.lovItemEnum.DATASET:
 			$scope.toolbarTitle = sbiModule_translate.load("sbi.behavioural.lov.details.datasetWizard");
 			cleanSelections();
-			
-			break;	
+
+			break;
 		default:
 			break;
 		}
-	 
-	 
+
+
 	 for (var i = 0; i < $scope.listOfInputTypes.length; i++) {
 			if($scope.listOfInputTypes[i].VALUE_CD == item){
 				$scope.selectedLov.itypeId = ""+$scope.listOfInputTypes[i].VALUE_ID;
 			}
 		}
-	 	
+
 	 if($scope.selectedLov.lovProvider && !$scope.selectedLov.lovProvider.hasOwnProperty(prop)){
-		 
+
 		 formatForTest($scope.selectedLov,'new');
 		 }
 	}
-	
-	
+
+
 	var cleanSelections = function() {
 		$scope.enableTest = false;
 		$scope.selectedScriptType={};
@@ -440,14 +532,14 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 	 * @author: spetrovic (Stefan.Petrovic@mht.net)
 	 */
 	$scope.openAttributesFromLOV = function() {
-		
+
 		sbiModule_restServices.promiseGet("2.0/attributes", '')
 		.then(function(response) {
 			$scope.listOfProfileAttributes = response.data;
 			console.log($scope.listOfProfileAttributes);
 		}, function(response) {
 			sbiModule_messaging.showErrorMessage(response.data.errors[0].message, sbiModule_translate.load("sbi.generic.toastr.title.error"));
-			
+
 		});
 		$mdDialog
 		.show({
@@ -455,11 +547,11 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 			preserveScope : true,
 			parent : angular.element(document.body),
 			controllerAs : 'LOVSctrl',
-			templateUrl : sbiModule_config.contextName +'/js/src/angular_1.4/tools/catalogues/templates/profileAttributes.html',
+			templateUrl : sbiModule_config.dynamicResourcesBasePath +'/angular_1.4/tools/catalogues/templates/profileAttributes.html',
 			clickOutsideToClose : false,
 			hasBackdrop : false
 		});
-	}	
+	}
 	/**
 	 * Function opens dialog with information
 	 * about selection
@@ -467,20 +559,19 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 	 */
 	$scope.openInfoFromLOV = function() {
 		if($scope.selectedLov.itypeCd != $scope.lovItemEnum.DATASET){
-			console.lo
 			$mdDialog
 			.show({
 				scope : $scope,
 				preserveScope : true,
 				parent : angular.element(document.body),
 				controllerAs : 'LOVSctrl',
-				templateUrl : sbiModule_config.contextName +'/js/src/angular_1.4/tools/catalogues/templates/Info.html',
+				templateUrl : sbiModule_config.dynamicResourcesBasePath +'/angular_1.4/tools/catalogues/templates/Info.html',
 				clickOutsideToClose : false,
 				hasBackdrop : false
 			});
-			
+
 		}
-			
+
 	}
 	$scope.closeDialogFromLOV = function() {
 		$scope.testLovTreeModel = [];
@@ -490,16 +581,16 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 		$scope.previewLovModel = [];
 		$scope.paramsList = [];
 		$scope.paramObj = {};
-		
+
 		$mdDialog.cancel();
 		console.log(sbiModule_device.browser.name);
 	}
-	
+
 	$scope.$watch('attributeForm.$invalid',function(newValue,oldValue){
-		
-		
+
+
 		switch(newValue){
-	
+
 		case false:
 			if($scope.previewClicked)
 			$scope.enableTest = true;
@@ -509,23 +600,23 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 			break
 		}
 	})
-	
+
 	/**
-	 * When clicking on Save button in the header of the right panel, 
+	 * When clicking on Save button in the header of the right panel,
 	 * this function will be called and the functionality for saving
-	 * LOV into the DB will be run. 	 * 
+	 * LOV into the DB will be run. 	 *
 	 * @author: danristo (danilo.ristovski@mht.net)
 	 */
 	$scope.saveLov = function(){  // this function is called when clicking on save button
-		
+
 		if(formatForSave()){
-			
+
 			if($scope.selectedLov.hasOwnProperty("id")){ // if item already exists do update PUT
-				
+
 				sbiModule_restServices.promisePut("2.0/lovs","",$scope.selectedLov)
 				.then(function(response) {
 					$scope.listOfLovs = [];
-					$timeout(function(){								
+					$timeout(function(){
 						$scope.getAllLovs();
 					}, 1000);
 					sbiModule_messaging.showSuccessMessage(sbiModule_translate.load("sbi.catalogues.toast.updated"), 'Success!');
@@ -533,19 +624,19 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 					//$scope.showMe=false;
 					$scope.dirtyForm=false;
 					$scope.closeDialogFromLOV();
-					
+
 				}, function(response) {
 					sbiModule_messaging.showErrorMessage(response.data.errors[0].message, 'Error');
-					
-				});	
-				
+
+				});
+
 			}else{
-			
+
 			sbiModule_restServices.promisePost("2.0/lovs/save","",$scope.selectedLov)
 			.then(function(response) {
 				var id = response.data;
 				$scope.listOfLovs = [];
-				$timeout(function(){								
+				$timeout(function(){
 					$scope.getAllLovs().then(function(response){
 						$scope.itemOnClick($filter('filter')($scope.listOfLovs,{"id":id},true)[0]);
 					});
@@ -555,36 +646,36 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 				//$scope.showMe=false;
 				$scope.dirtyForm=false;
 				$scope.closeDialogFromLOV();
-				
+
 			}, function(response) {
 				sbiModule_messaging.showErrorMessage(response.data.errors[0].message, 'Error');
-				
-			});			
+
+			});
 			}
 		}
-		
+
 	}
-	
-	
-	
+
+
+
 
 	$scope.updateLovWithoutProvider = function() {
 		var result = {}
 		var propName = $scope.selectedLov.itypeCd;
 		var prop = lovProviderEnum[propName];
-		
+
 		switch (prop) {
 		case lovProviderEnum.QUERY:
 			$scope.selectedLov.lovProvider[prop].CONNECTION = $scope.selectedQuery.datasource;
 			$scope.selectedLov.lovProvider[prop].STMT = $scope.selectedQuery.query;
-			
+
 		break;
 		case lovProviderEnum.SCRIPT:
 			$scope.selectedLov.lovProvider[prop].LANGUAGE = $scope.selectedScriptType.language;
 			$scope.selectedLov.lovProvider[prop].SCRIPT =  $scope.selectedScriptType.text;
 		break;
 		case lovProviderEnum.FIX_LOV:
-			
+
 			if($scope.listForFixLov != null && $scope.listForFixLov.length > 1){
 				$scope.selectedLov.lovProvider[prop].ROWS.ROW = $scope.listForFixLov;
 			}else if($scope.listForFixLov != null && $scope.listForFixLov.length == 1){
@@ -602,10 +693,10 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 						$scope.selectedLov.lovProvider[prop].LABEL = $scope.listOfDatasets[i].label;
 					}
 				}
-			}		
+			}
 		break;
 		}
-		
+
 		var tempObj = $scope.selectedLov.lovProvider[prop];
 		result[prop] = tempObj
 		var x2js = new X2JS();
@@ -614,12 +705,12 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 			xmlAsStr= xmlAsStr.replace(/&#x27;/g, "'")
 		}
 		$scope.selectedLov.lovProvider = xmlAsStr;
-		
-		
+
+
 		sbiModule_restServices.promisePut("2.0/lovs","",$scope.selectedLov)
 		.then(function(response) {
 			$scope.listOfLovs = [];
-			$timeout(function(){								
+			$timeout(function(){
 				$scope.getAllLovs();
 			}, 1000);
 			sbiModule_messaging.showSuccessMessage(sbiModule_translate.load("sbi.catalogues.toast.updated"), 'Success!');
@@ -627,16 +718,16 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 			$scope.showMe=false;
 			$scope.dirtyForm=false;
 			$scope.closeDialogFromLOV();
-			
+
 		}, function(response) {
 			sbiModule_messaging.showErrorMessage(response.data.errors[0].message, 'Error');
-			
-		});	
-		
+
+		});
+
 	}
 	/**
-	 * When clicking on Cancel button in the header of the right panel, 
-	 * this function will be called and the right panel will be hidden.	  
+	 * When clicking on Cancel button in the header of the right panel,
+	 * this function will be called and the right panel will be hidden.
 	 * @author: danristo (danilo.ristovski@mht.net)
 	 */
 	$scope.cancel = function()
@@ -645,19 +736,19 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 		$scope.dirtyForm=false;
 		$scope.selectedLov = {};
 		$scope.selectedFIXLov= {};
-		
+
 	}
-	
+
 	/**
 	 * Action that will happen when user clicks on the "Add" button that
-	 * adds new pair (label, description) for current Fixed LOV item 
+	 * adds new pair (label, description) for current Fixed LOV item
 	 * (second panel on the right side of the page).
 	 * @author: danristo (danilo.ristovski@mht.net)
 	 */
 	$scope.addNewFixLOV = function()
-	{	
+	{
 		if($scope.listForFixLov.length> 0){
-		
+
 			for (var i = 0; i < $scope.listForFixLov.length; i++) {
 				if($scope.selectedFIXLov.VALUE !=  $scope.listForFixLov[i].VALUE && $scope.selectedFIXLov.DESCRIPTION !=  $scope.listForFixLov[i].DESCRIPTION){
 					console.log("new one");
@@ -673,15 +764,15 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 					break;
 				}
 			}
-		
+
 	} else{
 		$scope.listForFixLov.push($scope.selectedFIXLov);
 		$scope.selectedFIXLov= {};
 	}
-		
-		
+
+
 	}
-	
+
 	var escapeXml =  function(unsafe) {
 		   return unsafe.replace(/&apos;/g, "'")
            .replace(/&quot;/g, '"')
@@ -689,91 +780,100 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
            .replace(/&lt;/g, '<')
            .replace(/&amp;/g, '&');
 	}
-	
-	
+
+
 	var decode = function(item){
 		try {
 			if(item.lovProvider.SCRIPTLOV){
 				item.lovProvider.SCRIPTLOV.SCRIPT = base64.decode(item.lovProvider.SCRIPTLOV.SCRIPT);
 				item.lovProvider.SCRIPTLOV.SCRIPT = escapeXml(item.lovProvider.SCRIPTLOV.SCRIPT);
-				
-				
+
+
 			}
 			if(item.lovProvider.QUERY){
 				item.lovProvider.QUERY.STMT = base64.decode(item.lovProvider.QUERY.STMT);
 				item.lovProvider.QUERY.STMT = escapeXml(item.lovProvider.QUERY.STMT);
-			}			
+			}
 		}catch(err) {}
-		
+
 	};
-	
-	
+
+
 	/**
 	 * Function that handles what should be done when user clicks on the
 	 * LOV item on the left side of the page (the one from the catalog).
 	 * @author: danristo (danilo.ristovski@mht.net)
 	 */
 	$scope.itemOnClick = function(item){
-		
+
 		item.lovProvider = angular.fromJson(item.lovProvider);
 		decode(item);
 		$scope.selectedLov=angular.copy(item);
 		console.log($scope.selectedLov);
 		$scope.changeLovType($scope.selectedLov.itypeCd);
-		
+
 		if ($scope.selectedLov.lovProvider.hasOwnProperty(lovProviderEnum.SCRIPT)) {
 			if($scope.selectedLov.lovProvider.SCRIPTLOV.LANGUAGE != null){
-				$scope.selectedScriptType.language = $scope.selectedLov.lovProvider.SCRIPTLOV.LANGUAGE;		
+				$scope.selectedScriptType.language = $scope.selectedLov.lovProvider.SCRIPTLOV.LANGUAGE;
 			}else{
 				$scope.selectedScriptType.language = 'groovy';
 			}
-						
+
 			$scope.selectedScriptType.text = $scope.selectedLov.lovProvider.SCRIPTLOV.SCRIPT;
-			
+
 		}else if($scope.selectedLov.lovProvider.hasOwnProperty(lovProviderEnum.QUERY)){
-			
+
 			$scope.selectedQuery.datasource = $scope.selectedLov.lovProvider.QUERY.CONNECTION;
 			$scope.selectedQuery.query = $scope.selectedLov.lovProvider.QUERY.STMT;
-			
+
 		}else if ($scope.selectedLov.lovProvider.hasOwnProperty(lovProviderEnum.FIX_LOV)) {
-			
+
 			if(Array === $scope.selectedLov.lovProvider.FIXLISTLOV.ROWS.ROW.constructor){
-				
+
 				$scope.listForFixLov = [];
 				$scope.listForFixLov = $scope.selectedLov.lovProvider.FIXLISTLOV.ROWS.ROW;
 			}else{
 				$scope.listForFixLov = [];
 				$scope.listForFixLov.push($scope.selectedLov.lovProvider.FIXLISTLOV.ROWS.ROW);
 			}
-			
+
 		}else if($scope.selectedLov.lovProvider.hasOwnProperty(lovProviderEnum.JAVA_CLASS)){
-			
+
 			$scope.selectedJavaClass.name = $scope.selectedLov.lovProvider.JAVACLASSLOV.JAVA_CLASS_NAME;
-			
+
 		}else if ($scope.selectedLov.lovProvider.hasOwnProperty(lovProviderEnum.DATASET)) {
-			
-			$scope.selectedDataset.id = $scope.selectedLov.lovProvider.DATASET.ID;
+			var dataSetId = $scope.selectedLov.lovProvider.DATASET.ID;
+
+			sbiModule_restServices.promiseGet("1.0/datasets/dataset/id", dataSetId)
+			.then(function(response){
+				var dataSet = response.data[0];
+				$scope.selectedDataset.id = dataSet.id;
+				$scope.selectedDataset.label = dataSet.label;
+				$scope.selectedDataset.name = dataSet.name;
+			}, function(response){
+				sbiModule_messaging.showErrorMessage(response.data.errors[0].message, sbiModule_translate.load("sbi.generic.toastr.title.error"));
+			});
 		}
-		
+
 		if($scope.dirtyForm){
 			   $mdDialog.show($scope.confirm).then(function(){
-				$scope.dirtyForm=false;   
+				$scope.dirtyForm=false;
 				$scope.selectedLov=angular.copy(item);
 				$scope.showMe=true;
-				
-				
+
+
 			   },function(){
-			    
+
 				$scope.showMe = true;
 			   });
-			   
+
 			  }else{
-			 
+
 			  $scope.selectedLov=angular.copy(item);
 			  $scope.showMe=true;
 			  }
 	}
-	
+
 	/**
 	 * Function that bind fixed lov item with model
 	 * @author: spetrovic (Stefan.Petrovic@mht.net)
@@ -790,13 +890,13 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 		var firstRow = $scope.listForFixLov[0];
 		var lastRow = $scope.listForFixLov[$scope.listForFixLov.length-1];
 		if(direction == 'up'){
-			
+
 			if(row.VALUE == firstRow.VALUE){
 				return false;
 			}else{
 				return true;
 			}
-			
+
 		}else if (direction == 'down') {
 			if(row.VALUE == lastRow.VALUE){
 				return false;
@@ -804,8 +904,8 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 				return true;
 			}
 		}
-		
-		
+
+
 	}
 	/**
 	 * Functions that moves items in table up or down
@@ -830,12 +930,12 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 	 * @author: spetrovic (Stefan.Petrovic@mht.net)
 	 */
 	var deleteFixedLovItem = function(item){
-		var index = $scope.listForFixLov.indexOf(item);		
+		var index = $scope.listForFixLov.indexOf(item);
 		$scope.listForFixLov.splice(index, 1);
 	}
-	
+
 	var deleteTreeLevel = function(item){
-		var index = $scope.testLovTreeModel.indexOf(item);		
+		var index = $scope.testLovTreeModel.indexOf(item);
 		$scope.testLovTreeModel.splice(index, 1);
 	}
 	/**
@@ -851,12 +951,12 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 			}, function(response) {
 
 				sbiModule_messaging.showErrorMessage(response.data.errors[0].message, sbiModule_translate.load("sbi.generic.toastr.title.error"));
-				
+
 			});
-			
+
 			return promise;
 		}
-		
+
 		/**
 		 * Get all input types for populating the GUI item that
 		 * holds them when specifying the LOV item. This is used
@@ -864,36 +964,36 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 		 * to define.
 		 * @author: danristo (danilo.ristovski@mht.net)
 		 */
-		
+
 		$scope.getInputTypes = function() {
 			sbiModule_restServices.promiseGet("domains", "listValueDescriptionByType","DOMAIN_TYPE=INPUT_TYPE")
 			.then(function(response) {
 				$scope.listOfInputTypes = response.data;
 			}, function(response) {
-				
+
 				sbiModule_messaging.showErrorMessage(response.data.errors[0].message, sbiModule_translate.load("sbi.generic.toastr.title.error"));
-				
+
 			});
 		}
-		
+
 		/**
 		 * Get all script types from the DB in order to populate
-		 * its GUI element so user can pick the script type he 
+		 * its GUI element so user can pick the script type he
 		 * wants for the Script input type.
 		 * @author: danristo (danilo.ristovski@mht.net)
 		 */
-		
+
 		$scope.getScriptTypes = function() {
 			sbiModule_restServices.promiseGet("domains", "listValueDescriptionByType","DOMAIN_TYPE=SCRIPT_TYPE")
 			.then(function(response) {
 				$scope.listOfScriptTypes = response.data;
 			}, function(response) {
 				sbiModule_messaging.showErrorMessage(response.data.errors[0].message, sbiModule_translate.load("sbi.generic.toastr.title.error"));
-				
+
 			});
 		}
-		
-		
+
+
 		/**
 		 * Get datasources from the DB in order to populate the combo box
 		 * that servers as a datasource picker for Query input type for
@@ -906,32 +1006,34 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 				$scope.listOfDatasources = response.data;
 			}, function(response) {
 				sbiModule_messaging.showErrorMessage(response.data.errors[0].message, sbiModule_translate.load("sbi.generic.toastr.title.error"));
-				
+
 			});
 		}
-		
+
 		/**
 		 * Get datasets from the DB in order to populate the combo box
 		 * that servers as a dataset picker for Dataset input type for
 		 * LOV.
 		 * @author: danristo (danilo.ristovski@mht.net)
 		 */
-		
+
 		$scope.getDatasets = function() {
-			sbiModule_restServices.promiseGet("1.0/datasets/datasetsforlov","")
-			.then(function(response) {
-				console.log(response);
-				$scope.listOfDatasets = response.data;
-				console.log($scope.listOfDatasets);
-			}, function(response) {
-				sbiModule_messaging.showErrorMessage(response.data.errors[0].message, sbiModule_translate.load("sbi.generic.toastr.title.error"));
-				
-			});
+			if ($scope.listOfDatasets.length == 0) {
+				sbiModule_restServices.promiseGet("1.0/datasets/datasetsforlov","")
+				.then(function(response) {
+					$scope.listOfDatasets = response.data;
+					addDataset();
+				}, function(response) {
+					sbiModule_messaging.showErrorMessage(response.data.errors[0].message, sbiModule_translate.load("sbi.generic.toastr.title.error"));
+				});
+			} else {
+				addDataset();
+			}
 		}
-		
+
 		$scope.testLov = function() {
-			
-			
+
+
 			 $scope.buildTestTable();
 			 console.log($scope.tableModelForTest)
 			$mdDialog
@@ -940,13 +1042,13 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 				preserveScope : true,
 				parent : angular.element(document.body),
 				controllerAs : 'LOVSctrl',
-				templateUrl : sbiModule_config.contextName +'/js/src/angular_1.4/tools/catalogues/templates/lovTest.html',
+				templateUrl : sbiModule_config.dynamicResourcesBasePath +'/angular_1.4/tools/catalogues/templates/lovTest.html',
 				clickOutsideToClose : false,
 				hasBackdrop : false
 			});
 		}
-		
-		
+
+
 		$scope.indexInList = function(item, list) {
 
 			for (var i = 0; i < list.length; i++) {
@@ -958,9 +1060,9 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 
 			return -1;
 		}
-		
+
 		 $scope.tableFunction = {
-		 
+
 			 getItem : function(row,column){
 				 if(column == 'description' && row.name == $scope.treeListTypeModel['DESCRIPTION-COLUMN']){
 					 return true;
@@ -969,7 +1071,7 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 					 return true;
 				 }
 				 if(column == 'visible'){
-					 
+
 						 for (var i = 0; i < $scope.formatedVisibleValues.length; i++) {
 								if($scope.formatedVisibleValues[i] == row.name){
 									return true;
@@ -977,37 +1079,37 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 							}
 				 }
 			 },
-		 	
+
 		 	setItem :  function(row,column){
 		 		 if(column == 'description'){
 		 			$scope.treeListTypeModel['DESCRIPTION-COLUMN'] = row.name;
-				 }	
+				 }
 		 		 if(column == 'value'){
 			 			$scope.treeListTypeModel['VALUE-COLUMN'] = row.name;
 		 		 }
 		 		 if(column == 'visible'){
-		 			 
-		 			var index = $scope.indexInList(row,$scope.formatedVisibleValues); 
-		 			
+
+		 			var index = $scope.indexInList(row,$scope.formatedVisibleValues);
+
 		 			if (index != -1) {
 		 				$scope.formatedVisibleValues.splice(index, 1);
 					} else {
 						$scope.formatedVisibleValues.push(row.name);
 					}
-		 			 
-		 		 	
+
+
 		 		 }
 		 	}
 		 }
-		
+
 		var deleteLovItem = function(item) {
-			
+
 			sbiModule_restServices
 					.promiseDelete("2.0/lovs/delete",item.id)
 					.then(
 							function(response) {
 								$scope.listOfLovs = [];
-								$timeout(function(){								
+								$timeout(function(){
 									$scope.getAllLovs();
 								}, 1000);
 								sbiModule_messaging.showSuccessMessage(sbiModule_translate.load("sbi.catalogues.toast.deleted"), 'Success!');
@@ -1020,97 +1122,97 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 								sbiModule_messaging.showErrorMessage(response.data.errors[0].message, 'Error');
 							});
 		}
-		
-		
+
+
 		var formatForTest = function(item,state){
-			
+
 			var propName = $scope.selectedLov.itypeCd;
 			var prop = lovProviderEnum[propName];
-			
+
 			if(state == 'new'){
 				$scope.selectedLov.lovProvider = {};
 				$scope.selectedLov.lovProvider[prop] = {
-						
+
 						"LOVTYPE" : "simple",
 						};
-				
-				
-				
+
+
+
 				switch (prop) {
 				case lovProviderEnum.QUERY:
-					
+
 					$scope.selectedLov.lovProvider[prop]['VISIBLE-COLUMNS'] = "";
 					$scope.selectedLov.lovProvider[prop]['INVISIBLE-COLUMNS'] = "";
-					
+
 					$scope.selectedLov.lovProvider[prop]['DESCRIPTION-COLUMN'] = "";
 					$scope.selectedLov.lovProvider[prop]['VALUE-COLUMN'] = "";
-					
+
 				break;
 				case lovProviderEnum.SCRIPT:
-					
+
 					$scope.selectedLov.lovProvider[prop]['VISIBLE-COLUMNS'] = "";
 					$scope.selectedLov.lovProvider[prop]['INVISIBLE-COLUMNS'] = "";
-					
+
 					$scope.selectedLov.lovProvider[prop]['DESCRIPTION-COLUMN'] = "";
 					$scope.selectedLov.lovProvider[prop]['VALUE-COLUMN'] = "";
-					
+
 					$scope.selectedLov.lovProvider[prop]['TREE-LEVELS-COLUMNS'] = "";
-					
-					
+
+
 				break;
 				case lovProviderEnum.FIX_LOV:
-					
+
 					$scope.selectedLov.lovProvider[prop]['VISIBLE-COLUMNS'] = "DESCRIPTION";
 					$scope.selectedLov.lovProvider[prop]['INVISIBLE-COLUMNS'] = "VALUE";
-					
+
 					$scope.selectedLov.lovProvider[prop]['DESCRIPTION-COLUMN'] = "DESCRIPTION";
 					$scope.selectedLov.lovProvider[prop]['VALUE-COLUMN'] = "VALUE";
-					
+
 					$scope.selectedLov.lovProvider[prop]['TREE-LEVELS-COLUMNS'] = "";
-					
+
 					$scope.selectedLov.lovProvider[prop].ROWS = {};
-					
+
 				break;
 				case lovProviderEnum.JAVA_CLASS:
-					
+
 					$scope.selectedLov.lovProvider[prop]['VISIBLE-COLUMNS'] = "VALUE";
 					$scope.selectedLov.lovProvider[prop]['INVISIBLE-COLUMNS'] = "VALUE";
-					
+
 					$scope.selectedLov.lovProvider[prop]['DESCRIPTION-COLUMN'] = "VALUE";
 					$scope.selectedLov.lovProvider[prop]['VALUE-COLUMN'] = "VALUE";
-					
+
 					$scope.selectedLov.lovProvider[prop]['TREE-LEVELS-COLUMNS'] = "";
-					
+
 				break;
 				case lovProviderEnum.DATASET:
-					
+
 					$scope.selectedLov.lovProvider[prop]['VISIBLE-COLUMNS'] = "";
 					$scope.selectedLov.lovProvider[prop]['INVISIBLE-COLUMNS'] = "";
-					
-					$scope.selectedLov.lovProvider[prop]['DESCRIPTION-COLUMN'] = "null";
-					$scope.selectedLov.lovProvider[prop]['VALUE-COLUMN'] = "null";
-						
+
+					$scope.selectedLov.lovProvider[prop]['DESCRIPTION-COLUMN'] = "";
+					$scope.selectedLov.lovProvider[prop]['VALUE-COLUMN'] = "";
+
 				break;
 				}
-				
+
 			}
-			
-			
-			
+
+
+
 			switch (prop) {
 			case lovProviderEnum.QUERY:
-				
-				
+
+
 				$scope.selectedLov.lovProvider[prop].CONNECTION = $scope.selectedQuery.datasource;
 				$scope.selectedLov.lovProvider[prop].STMT = $scope.selectedQuery.query;
-				
+
 			break;
 			case lovProviderEnum.SCRIPT:
 				$scope.selectedLov.lovProvider[prop].LANGUAGE = $scope.selectedScriptType.language;
 				$scope.selectedLov.lovProvider[prop].SCRIPT =  $scope.selectedScriptType.text;
 			break;
 			case lovProviderEnum.FIX_LOV:
-				
+
 				if($scope.listForFixLov != null && $scope.listForFixLov.length > 1){
 					$scope.selectedLov.lovProvider[prop].ROWS.ROW = $scope.listForFixLov;
 				}else if($scope.listForFixLov != null && $scope.listForFixLov.length == 1){
@@ -1129,24 +1231,24 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 						}
 					}
 				}
-				
-					
+
+
 			break;
 			}
-			
+
 					}
-		
+
 		var formatForSave = function() {
 			console.log(sbiModule_device);
 			var result = {}
 			var propName = $scope.selectedLov.itypeCd;
 			var prop = lovProviderEnum[propName];
-			
+
 			var tempObj = $scope.selectedLov.lovProvider[prop];
-			
+
 
 			if(!$scope.treeListTypeModel || $scope.treeListTypeModel.LOVTYPE == 'simple'){
-				
+
 				tempObj['DESCRIPTION-COLUMN'] = $scope.treeListTypeModel['DESCRIPTION-COLUMN'];
 				tempObj['VALUE-COLUMN'] = $scope.treeListTypeModel['VALUE-COLUMN'];
 				tempObj['VISIBLE-COLUMNS'] = $scope.formatedVisibleValues.join();
@@ -1156,50 +1258,50 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 				    }
 				  }
 				tempObj['INVISIBLE-COLUMNS'] = $scope.formatedInvisibleValues.join();
-				
-				
+
+
 			}else{
-				
-				
+
+
 				//tempObj['TREE-LEVELS-COLUMNS'] = "";
 				delete tempObj['DESCRIPTION-COLUMN'];
 				delete tempObj['VALUE-COLUMN'];
 				$scope.formatedDescriptionColumns=[];
 				$scope.formatedValueColumns=[];
-				
+
 				for (var i = 0; i < $scope.testLovTreeModel.length; i++) {
 					$scope.formatedDescriptionColumns.push($scope.testLovTreeModel[i].description);
 				}
 				tempObj['DESCRIPTION-COLUMNS'] = $scope.formatedDescriptionColumns.join();
-				
+
 				for (var i = 0; i < $scope.testLovTreeModel.length; i++) {
 					$scope.formatedValueColumns.push($scope.testLovTreeModel[i].value);
 				}
 				tempObj['VALUE-COLUMNS'] = $scope.formatedValueColumns.join();
-				
+
 				for (var i = 0; i < $scope.testLovModel.length; i++) {
-					
+
 					if ($scope.formatedValueColumns.indexOf($scope.testLovModel[i].name) === -1) {
 				    	$scope.formatedInvisibleValues.push($scope.testLovModel[i].name);
 				    }
-					
+
 					  }
 					tempObj['INVISIBLE-COLUMNS'] = $scope.formatedInvisibleValues.join();
 			}
-			
-			
+
+
 			tempObj.LOVTYPE = $scope.treeListTypeModel.LOVTYPE;
-			
+
 			if(tempObj.LOVTYPE == "simple" && (tempObj['VALUE-COLUMN'] == "" || tempObj['DESCRIPTION-COLUMN'] == "") ){
 				sbiModule_messaging.showErrorMessage("Value or description field is empty", sbiModule_translate.load("sbi.generic.toastr.title.error"));
 				return false;
 			}
-			
+
 			if(tempObj.LOVTYPE == "tree" && (tempObj['VALUE-COLUMNS'] == "" || tempObj['DESCRIPTION-COLUMNS'] == "") ){
 				sbiModule_messaging.showErrorMessage("Tree is not defined", sbiModule_translate.load("sbi.generic.toastr.title.error"));
 				return false;
 			}
-			
+
 			result[prop] = tempObj
 			var x2js = new X2JS();
 			var xmlAsStr = x2js.json2xml_str(result);
@@ -1208,9 +1310,9 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 			}
 			$scope.selectedLov.lovProvider = xmlAsStr;
 			return true;
-		
+
 		}
-		
+
 		$scope.formatColumns = function(array) {
 			var arr = [];
 			var size = array.length;
@@ -1219,29 +1321,29 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 				obj.label = array[i].name;
 				obj.name = array[i].name;
 				if(size <=10){
-				obj.size = "60px"	
+				obj.size = "60px"
 				}
 				arr.push(obj);
 			}
 			return arr;
 		}
-		
+
 		$scope.checkForDependencies = function(){
-			
+
 			var toSend ={};
 			var selectedLovForDependencyChecking = angular.copy($scope.selectedLov);
-			var x2js = new X2JS(); 
-			var xmlAsStr = x2js.json2xml_str(selectedLovForDependencyChecking.lovProvider); 
+			var x2js = new X2JS();
+			var xmlAsStr = x2js.json2xml_str(selectedLovForDependencyChecking.lovProvider);
 			selectedLovForDependencyChecking.lovProvider = xmlAsStr;
-			
-			
+
+
 			toSend.provider = selectedLovForDependencyChecking.lovProvider;
-			
+
 			sbiModule_restServices.promisePost("2.0", "lovs/checkdependecies",toSend)
 			.then(function(response) {
 				$scope.listOfEmptyDependencies = [];
 				$scope.listOfEmptyDependencies = response.data;
-				
+
 				if($scope.listOfEmptyDependencies.length > 0){
 					$scope.dependenciesList = [];
 					for (var i = 0; i < $scope.listOfEmptyDependencies.length; i++) {
@@ -1251,73 +1353,73 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 						$scope.dependenciesList.push($scope.dependencyObj);
 						$scope.dependencyObj = {};
 					}
-					
+
 					$mdDialog
 					.show({
 						scope : $scope,
 						preserveScope : true,
 						parent : angular.element(document.body),
 						controllerAs : 'LOVSctrl',
-						templateUrl : sbiModule_config.contextName +'/js/src/angular_1.4/tools/catalogues/templates/lovParams.html',
+						templateUrl : sbiModule_config.dynamicResourcesBasePath +'/angular_1.4/tools/catalogues/templates/lovParams.html',
 						clickOutsideToClose : false,
 						hasBackdrop : false
 					});
-					
-					
+
+
 				}else{
 					$scope.previewLov();
 				}
-				
-				
+
+
 			}, function(response) {
 
 				sbiModule_messaging.showErrorMessage(response.data.errors[0].message, sbiModule_translate.load("sbi.generic.toastr.title.error"));
-				
+
 			});
-			
+
 			selectedLovForDependencyChecking = null;
 		}
-		
-		
+
+
 		$scope.openPreviewDialog = function() {
-			
-			
-			
+
+
+
 			$scope.paginationObj.paginationStart = 0;
 			$scope.paginationObj.paginationLimit = 20;
 			$scope.paginationObj.paginationEnd = 20;
 			if(!$scope.selectedLov.hasOwnProperty('lovProvider')){
-				
+
 				formatForTest($scope.selectedLov,'new');
 				console.log("new")
 			}else{
 				formatForTest($scope.selectedLov,'edit');
 				console.log("edit")
 			}
-			
+
 			$scope.checkForDependencies();
-			
-			
+
+
 		}
-		
+
 		$scope.previewLov = function(dependencies) {
-			
+
 			$scope.perviewClicked = true;
 			var toSend ={};
 			var selectedLovForPreview = angular.copy($scope.selectedLov);
-			var x2js = new X2JS(); 
-			var xmlAsStr = x2js.json2xml_str(selectedLovForPreview.lovProvider); 
+			var x2js = new X2JS();
+			var xmlAsStr = x2js.json2xml_str(selectedLovForPreview.lovProvider);
 			selectedLovForPreview.lovProvider = xmlAsStr;
 
-			
+
 			toSend.data = selectedLovForPreview;
 			toSend.pagination = $scope.paginationObj;
 			if(dependencies != undefined){
 				toSend.dependencies = dependencies;
 			}
-			
+
 			$scope.previewLovModel = [];
-			
+
 			sbiModule_restServices
 					.promisePost("2.0", "lovs/preview",toSend)
 					.then(
@@ -1325,37 +1427,37 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 							if(response.statusText == 'No Content'){
 								$scope.enableTest = false;
 								sbiModule_messaging.showErrorMessage("Check your syntax", sbiModule_translate.load("sbi.generic.toastr.title.error"));
-								
+
 							}else{
 								$scope.tableModelForTest = response.data.metaData.fields;
 								$scope.previewLovColumns = $scope.formatColumns(response.data.metaData.fields);
 								$scope.previewLovModel = response.data.root;
 								$scope.paginationObj.size = response.data.results;
-								
-								
+
+
 								$mdDialog
 								.show({
 									scope : $scope,
 									preserveScope : true,
 									parent : angular.element(document.body),
 									controllerAs : 'LOVSctrl',
-									templateUrl : sbiModule_config.contextName +'/js/src/angular_1.4/tools/catalogues/templates/lovPreview.html',
+									templateUrl : sbiModule_config.dynamicResourcesBasePath +'/angular_1.4/tools/catalogues/templates/lovPreview.html',
 									clickOutsideToClose : false,
 									hasBackdrop : false
 								});
-								
-								
+
+
 								if(!$scope.attributeForm.$invalid){
 									$scope.enableTest = true;
 								} else {
 									$scope.enableTest = false;
 								}
-								
-							}	
-							
+
+							}
+
 							},
 							function(response) {
-								$scope.enableTest = false;	
+								$scope.enableTest = false;
 								sbiModule_messaging
 										.showErrorMessage(
 												"An error occured while getting properties for selected member",
@@ -1364,25 +1466,25 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 							});
 			selectedLovForPreview = null;
 		}
-		
+
 		 $scope.testTreeScopeFunctions = {
-				 
+
 					treeOptions: function() {
 						return $scope.tableModelForTest;
 					},
-						
-						
+
+
 				};
-		
+
 		$scope.doServerPagination = function() {
 			var toSend ={};
 			var selectedLovForPreview = angular.copy($scope.selectedLov);
-			var x2js = new X2JS(); 
-			var xmlAsStr = x2js.json2xml_str(selectedLovForPreview.lovProvider); 
+			var x2js = new X2JS();
+			var xmlAsStr = x2js.json2xml_str(selectedLovForPreview.lovProvider);
 			selectedLovForPreview.lovProvider = xmlAsStr;
 			toSend.data = selectedLovForPreview;
 			toSend.pagination = $scope.paginationObj;
-				
+
 			sbiModule_restServices
 					.promisePost("2.0", "lovs/preview",toSend)
 					.then(
@@ -1390,7 +1492,7 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 							$scope.previewLovColumns = $scope.formatColumns(response.data.metaData.fields);
 							$scope.previewLovModel = response.data.root;
 							$scope.paginationObj.size = response.data.results;
-							
+
 							},
 							function(response) {
 								sbiModule_messaging
@@ -1401,11 +1503,11 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 							});
 			selectedLovForPreview = null;
 		}
-		
+
 		$scope.getNextPreviewSet = function() {
 			console.log("page up");
 			$scope.paginationObj.paginationStart = $scope.paginationObj.paginationStart + $scope.paginationObj.paginationLimit;
-			
+
 			$scope.paginationObj.paginationEnd = $scope.paginationObj.paginationStart+$scope.paginationObj.paginationLimit;
 			if($scope.paginationObj.paginationEnd > $scope.paginationObj.size){
 				$scope.paginationObj.paginationEnd = $scope.paginationObj.size;
@@ -1417,10 +1519,10 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 			var temp = $scope.paginationObj.paginationStart;
 			$scope.paginationObj.paginationStart = $scope.paginationObj.paginationStart - $scope.paginationObj.paginationLimit;
 			$scope.paginationObj.paginationEnd = temp ;
-			
+
 			$scope.doServerPagination();
 		}
-		
+
 		$scope.checkArrows = function(type) {
 			if($scope.paginationObj.paginationStart == 0 && type == 'back'){
 				return true;
@@ -1429,9 +1531,9 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 				return true;
 			}
 		}
-		
+
 	$scope.moveToTree = function(item) {
-		
+
 		for (var i = 0; i < $scope.testLovTreeModel.length; i++) {
 			if($scope.testLovTreeModel[i].level == item.name){
 				return;
@@ -1443,18 +1545,18 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 		defObj.description = item.name;
 		$scope.testLovTreeModel.push(defObj);
 	}
-		
+
 	 $scope.buildTestTable = function() {
-		 
-		 
+
+
 		 if($scope.selectedLov != null){
 			 var propName = $scope.selectedLov.itypeCd;
 			 var prop = lovProviderEnum[propName];
 			 if($scope.selectedLov.lovProvider[prop].LOVTYPE == "" || $scope.selectedLov.lovProvider[prop].LOVTYPE == undefined){
 					$scope.selectedLov.lovProvider[prop].LOVTYPE = "simple";
-				}	 
+				}
 			 $scope.treeListTypeModel = {};
-			 
+
 			 $scope.treeListTypeModel = $scope.selectedLov.lovProvider[prop];
 			 if($scope.selectedLov.id != undefined){
 				 console.log("we have existing one")
@@ -1464,11 +1566,11 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 					 $scope.formatedValues = $scope.treeListTypeModel['VALUE-COLUMN'].split(",");
 					 $scope.formatedDescriptionValues = $scope.treeListTypeModel['DESCRIPTION-COLUMN'].split(",");
 				 }else{
-					 $scope.formatedValues = $scope.treeListTypeModel['VALUE-COLUMNS'].split(","); 
+					 $scope.formatedValues = $scope.treeListTypeModel['VALUE-COLUMNS'].split(",");
 					 $scope.formatedDescriptionValues = $scope.treeListTypeModel['DESCRIPTION-COLUMNS'].split(",");
 				 }
-				 
-				 
+
+
 			 }else{
 				 console.log("we have new one")
 				 $scope.treeListTypeModel.LOVTYPE = 'simple';
@@ -1477,14 +1579,14 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 				 $scope.testLovTreeModel = [];
 				 //$scope.formatedTreeValues = $scope.treeListTypeModel['TREE-LEVELS-COLUMNS'].split(",");
 				for (var i = 0; i < $scope.formatedValues.length; i++) {
-					
+
 					var defObj = {};
 					defObj.level = $scope.formatedValues[i];
 					defObj.value = $scope.formatedValues[i];
 					defObj.description = $scope.formatedDescriptionValues[i];
 
 					$scope.testLovTreeModel.push(defObj);
-				} 
+				}
 			 }
 		 }
 		 $scope.testLovModel = $scope.tableModelForTest;
@@ -1497,6 +1599,8 @@ function lovsManagementFunction(sbiModule_translate, sbiModule_restServices, $sc
 			}
 		}
 		 $scope.formatedVisibleValues =  newformatedVisibleValues;
-	 		 
+
 	 }
 };
+
+})();

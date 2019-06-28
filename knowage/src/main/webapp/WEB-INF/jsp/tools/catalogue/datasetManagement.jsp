@@ -39,7 +39,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <html ng-app="datasetModule">
 	
 	<head>
-	
+	<style >
+
+ .lower{
+ padding:5px;
+ }
+div.lower i  {
+  border: solid black;
+  border-width: 0 3px 3px 0;
+  display: inline-block;
+  padding: 2px;
+  height: 15px;
+  width: 15px;
+}
+.tagsUp {
+  transform: rotate(-135deg);
+  -webkit-transform: rotate(-135deg);
+}
+
+.tagsDown {
+  transform: rotate(45deg);
+  -webkit-transform: rotate(45deg);
+}
+</style>
 		<%@include file="/WEB-INF/jsp/commons/angular/angularImport.jsp"%>
 			
 		<link rel="stylesheet" type="text/css" href="<%=urlBuilder.getResourceLink(request, "themes/commons/css/customStyle.css")%>">
@@ -84,7 +106,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <script type="text/javascript"  src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/driversexecution/driversExecutionService.js")%>"></script>
 	  <script type="text/javascript" 
                 src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/documentexecution/documentParamenterElement/documentParamenterElementController.js")%>"></script>	
-	
+	  <script type="text/javascript" 
+                src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/driversexecution/renderparameters/renderParameters.js")%>"></script>
+ 
+ <!-- tags -->
+ 	<%@include file="/WEB-INF/jsp/tools/tags/tagsImport.jsp"%>
+
+ 
 		<title>Dataset Catalogue</title>
 		
 		<script>
@@ -102,11 +130,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		<div loading ng-show="showEl" style="position:fixed; z-index:500; height:100%; width:100%; background-color:black; opacity:0.5;">
 		 	<md-progress-circular md-mode="indeterminate" md-diameter="75%" style="position:fixed; top:calc(50% - 37.5px); left:calc(50% - 37.5px);"></md-progress-circular>		 
 		</div>			
-	
+		
+								 
+		
 		<angular-list-detail>
-	       
+	        
 	       	<list label="translate.load('sbi.roles.datasets')"  new-function="createNewDataSet">
-	       
+	       	<filter-by-tags tags-array="allTags" current-datasets-tab="'catalog'" filter-function="filterByTags()" inverse="true"></filter-by-tags>
 		       	<angular-table
 			     	flex
 				 	id="datasetList_id" 
@@ -249,7 +279,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		       						 	</div>
 								       
 								        </md-input-container>
-								   </div>
+								   </div> 
+							
+								   <tag-datasets tags="tags" all-tags="allTags"></tag-datasets>
+		
+								  
+								   
+								   
+								   
+								   
 								</md-card>
 							</md-content>
 							
@@ -364,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 					                  	
 									</div>
 									
-									<div layout="row" flex=100 ng-if="selectedDataSet.fileName && selectedDataSet.fileName!='' && !changingFile">
+									<div layout="row" flex=100 ng-if="selectedDataSet.fileName && selectedDataSet.fileName != '' && !changingFile">
 								 		
 								 		<label style="margin-top:14px; margin-bottom:8px">
 								 			{{translate.load("sbi.workspace.dataset.wizard.file.uploaded")}}: <strong>{{selectedDataSet.fileName}}</strong>
@@ -377,12 +415,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 										    <md-button 	ng-click="changeUploadedFile()" class="md-raised" 
 										    			title="{{translate.load('sbi.workspace.dataset.wizard.file.change.tooltip')}}">
 					                     			{{translate.load("sbi.workspace.dataset.wizard.file.change")}}
-				             				</md-button>
-			             				
-			           					</div>
-			             				
-									</div>
-									
+				             				</md-button>			             				
+			           					</div>		             				
+									</div>									
 								</md-card>
 								
 								<!-- ELEMENTS FOR SETTING THE 'XLS'/'XLSX' FILE CONFIGURATION -->
@@ -400,6 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 						                        		<input 	ng-model="selectedDataSet.skipRows" type="number" 
 						                        				step="1" min="0" value="{{selectedDataSet.skipRows}}"
 						                        				ng-change="setFormDirty()">
+				                        				<md-tooltip>{{translate.load("sbi.ds.file.xsl.skiprows.tooltip")}}</md-tooltip>
 							                     	</md-input-container>
 							                  	</div>
 											</div>
@@ -785,7 +821,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 								       	<label>{{translate.load("sbi.tools.managedatasets.datamartcombo.label")}}</label>
 								       
 								       	<md-select 	placeholder ="{{translate.load('sbi.tools.managedatasets.datamartcombo.label')}}"
-								        			ng-model="selectedDataSet.qbeDatamarts" ng-required="selectedDataSet.dsTypeCd=='Qbe'" ng-change="setFormDirty()">   
+								        			ng-model="selectedDataSet.qbeDatamarts" ng-required="selectedDataSet.dsTypeCd=='Qbe'" ng-change="setFormDirty();getDatasetParametersFromBusinessModel(selectedDataSet)">   
 									        <md-option ng-repeat="l in datamartList" value="{{l.name}}">{{l.name}}</md-option>										        
 								       	</md-select>  
 								       
@@ -2088,6 +2124,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 					</md-tabs>
 	       		
 	       		</form>
+	       		
+	       		<md-sidenav class="md-sidenav-right md-whiteframe-4dp" md-component-id="errors-columndetails-sidenav"> 
+					<md-toolbar class="md-theme-light"> 
+			 			<div class="md-toolbar-tools"> 
+			   	 			<h1 md-truncate flex="80">{{invalidColumn}}</h1>	       	 
+			    	 			<md-button class="md-icon-button" flex="20" aria-label="Close" ng-click="closeErrorDetails()"><i class="fa fa-times" aria-hidden="true"></i></md-button> 
+			   	 		</div> 
+			         </md-toolbar> 
+			         <md-content layout-padding> 
+			         	<md-list class="md-dense" flex ng-model="columnErrorDetails.errors">
+			 				<md-list-item class="md-2-line" ng-repeat="cell in columnErrorDetails.errors | limitTo: limit | orderBy:'id'">
+								<div class="md-list-item-text"> 
+			 						<h3>Row {{cell.id + columnErrorDetails.skipRows + 2 }}</h3> 
+								<p>{{translate.load(cell[columnString + index])}}</p> 
+			 					</div> 
+							</md-list-item> 
+			 			</md-list> 
+			 			<a style="text-decoration: none; font-style: italic;" ng-if="showMoreErrorsButton()" ng-click="extandErrorList()" href="">{{translate.load("sbi.workspace.dataset.wizard.metadata.validation.error.showmore")}}: {{remainingErros()}}</a>
+			         </md-content>
+			 	</md-sidenav>
 	       
 	       </detail>
 	       

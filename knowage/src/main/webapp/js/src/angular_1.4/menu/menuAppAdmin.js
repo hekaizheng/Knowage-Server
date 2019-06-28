@@ -39,7 +39,7 @@ myApp.directive('menuAside', ['$window','$http','$mdDialog','$mdToast', 'sbiModu
     return {
 
         restrict: 'E',
-        templateUrl: Sbi.config.contextName+"/js/src/angular_1.4/menu/templates/menuBarAdmin.html",
+        templateUrl: sbiModule_config.dynamicResourcesBasePath + "/angular_1.4/menu/templates/menuBarAdmin.html",
         replace: true,
         link:function($scope, elem, attrs) {
 
@@ -55,7 +55,7 @@ myApp.directive('menuAside', ['$window','$http','$mdDialog','$mdToast', 'sbiModu
         	    		curr_country: Sbi.config.curr_country,
         	    		curr_language: Sbi.config.curr_language
         	    	}
-        	}).success(function(data){
+        	}).then(function(response){
         		$scope.translate = sbiModule_translate;
         		$scope.messaging = sbiModule_messaging;
         		$scope.download = sbiModule_download;
@@ -66,13 +66,13 @@ myApp.directive('menuAside', ['$window','$http','$mdDialog','$mdToast', 'sbiModu
         		$scope.i18n.loadI18nMap().then(function() {
 
         			$scope.links = [];
-        			$scope.fixed = data.fixedMenu;
-        			$scope.userName = data.userName;
-        			$scope.groups = data.userMenu;
-        			if (data.customMenu != undefined && data.customMenu != null && data.customMenu.length > 0){
+        			$scope.fixed = response.data.fixedMenu;
+        			$scope.userName = response.data.userName;
+        			$scope.groups = response.data.userMenu;
+        			if (response.data.customMenu != undefined && response.data.customMenu != null && response.data.customMenu.length > 0){
 
-        				if(data.customMenu[0].menu != undefined){
-        					$scope.customs = data.customMenu[0].menu;
+        				if(response.data.customMenu[0].menu != undefined){
+        					$scope.customs = response.data.customMenu[0].menu;
         				}
         				else{
         					$scope.customs = {};
@@ -111,8 +111,8 @@ myApp.directive('menuAside', ['$window','$http','$mdDialog','$mdToast', 'sbiModu
 
         		}); // end of load I 18n
 
-        	}).
-        	error(function(error){
+        	},
+        	function(error){
         		$scope.showAlert('Attention, ' + $scope.userName,"Error Calling REST service for Menu. Please check if the server or connection is working.")
         	});
 
@@ -133,7 +133,7 @@ myApp.directive('menuAside', ['$window','$http','$mdDialog','$mdToast', 'sbiModu
         	       var parentEl = angular.element(document.body);
         	       $mdDialog.show({
         	         parent: parentEl,
-        	         templateUrl: Sbi.config.contextName+"/js/src/angular_1.4/menu/templates/languageDialog.html",
+        	         templateUrl: sbiModule_config.dynamicResourcesBasePath + "/angular_1.4/menu/templates/languageDialog.html",
         	         locals: {
         	           languages: $scope.languages
         	         }
@@ -192,13 +192,12 @@ myApp.directive('menuAside', ['$window','$http','$mdDialog','$mdToast', 'sbiModu
 		        	        	    params: {
 		        	        	    		SELECTED_ROLE: scope.defaultRole,
 		        	        	    	}
-		        	        	}).success(function(data){
+		        	        	}).then(function(data){
 		        	        		console.log("default role set correcty");
 		        	        		 //call again the home page
 		        	        		var homeUrl = Sbi.config.contextName+"/servlet/AdapterHTTP?PAGE=LoginPage"
 		        	        		window.location.href=homeUrl;
-		        	        	}).
-		        	        	error(function(error){
+		        	        	},function(error){
 		        	        		console.log("Error: default role NOT set");
 		        	        		$scope.showAlert('Attention, ' + $scope.userName,"Error setting default role. Please check if the server or connection is working.")
 		        	        	});
@@ -247,15 +246,15 @@ myApp.directive('menuAside', ['$window','$http','$mdDialog','$mdToast', 'sbiModu
 				$scope.licenseData=[];
 				$scope.hostsData=[];
 
-	        	$http.get(Sbi.config.contextName+'/restful-services/1.0/license').success(function(data){
-	        		if (data.errors){
-						$scope.messaging.showErrorMessage(data.errors[0].message,$scope.translate.load('sbi.generic.error'));
+	        	$http.get(Sbi.config.contextName+'/restful-services/1.0/license').then(function(response){
+	        		if (response.data.errors){
+						$scope.messaging.showErrorMessage(data.data.errors[0].message,$scope.translate.load('sbi.generic.error'));
 						return;
 					}
-	        		console.log("License Data:", data);
+	        		console.log("License Data:", response.data);
 
-	        		$scope.hostsData=data.hosts;
-	        		$scope.licenseData=data.licenses;
+	        		$scope.hostsData=response.data.hosts;
+	        		$scope.licenseData=response.data.licenses;
 					$mdDialog.show({
 						parent: parentEl,
 						templateUrl: Sbi.config.contextName+'/themes/'+Sbi.config.currTheme+'/html/license.jsp',
@@ -271,8 +270,7 @@ myApp.directive('menuAside', ['$window','$http','$mdDialog','$mdToast', 'sbiModu
 						},
 						controller: licenseDialogController
 					});
-	        	}).
-	        	error(function(error){
+	        	},function(error){
 	        		$scope.showAlert('Attention, ' + "Error Calling REST service for Menu. Please check if the server or connection is working.")
 	        	});
 
@@ -536,7 +534,7 @@ myApp.directive('menuAside', ['$window','$http','$mdDialog','$mdToast', 'sbiModu
 			      var parentEl = angular.element(document.body);
        	       $mdDialog.show({
        	         parent: parentEl,
-       	         templateUrl: Sbi.config.contextName+"/js/src/angular_1.4/menu/templates/accessibilityDialogTemplate.html",
+       	         templateUrl: sbiModule_config.dynamicResourcesBasePath+"/angular_1.4/menu/templates/accessibilityDialogTemplate.html",
        	         locals: {
 
        	         }
@@ -559,7 +557,6 @@ myApp.directive('menuAside', ['$window','$http','$mdDialog','$mdToast', 'sbiModu
        	        	};
        				sbiModule_restServices.promisePost('2.0/preferences','',preferencesObj)
        				.then(function(response) {
-       			         console.log(response);
        			      sbiModule_messaging.showSuccessMessage("preferences saved successfuly", 'Success');
        			        enableUIO=scope.enableUIO;
              	        enableRobobraille= scope.enableRobobraille;
@@ -569,7 +566,7 @@ myApp.directive('menuAside', ['$window','$http','$mdDialog','$mdToast', 'sbiModu
              	    	sbiModule_messaging.showSuccessMessage("Preferences saved successfuly", 'Successs');
              	    	$window.location.reload();
        				}, function(response) {
-       					sbiModule_messaging.showErrorMessage(response, 'Error');
+       					sbiModule_messaging.showErrorMessage(response.data, 'Error');
 
        				});
 
@@ -639,4 +636,6 @@ myApp.directive('menuAside', ['$window','$http','$mdDialog','$mdToast', 'sbiModu
 			}
         }
     };
+    
 }]);
+

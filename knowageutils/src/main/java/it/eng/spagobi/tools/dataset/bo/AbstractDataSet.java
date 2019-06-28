@@ -13,11 +13,14 @@
 package it.eng.spagobi.tools.dataset.bo;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.json.JSONException;
@@ -46,6 +49,7 @@ import it.eng.spagobi.tools.dataset.utils.DataSetUtilities;
 import it.eng.spagobi.tools.dataset.utils.DatasetMetadataParser;
 import it.eng.spagobi.tools.datasource.bo.DataSourceFactory;
 import it.eng.spagobi.tools.datasource.bo.IDataSource;
+import it.eng.spagobi.user.UserProfileManager;
 import it.eng.spagobi.utilities.StringUtils;
 import it.eng.spagobi.utilities.database.temporarytable.TemporaryTableManager;
 import it.eng.spagobi.utilities.engines.SpagoBIEngineRuntimeException;
@@ -70,7 +74,7 @@ public abstract class AbstractDataSet implements IDataSet {
 	private Map paramsMap;
 	Map<String, Object> properties;
 
-	private HashMap<String, Object> runtimeDrivers;
+	private Map<String, Object> runtimeDrivers;
 	// Transformer attributes (better to remove them.
 	// They should be stored only into dataSetTransformer (see above)
 	protected Integer transformerId;
@@ -123,11 +127,14 @@ public abstract class AbstractDataSet implements IDataSet {
 	private FederationDefinition datasetFederation;
 	private UserProfile userProfile;
 
+	private Set tags;
+
 	private static transient Logger logger = Logger.getLogger(AbstractDataSet.class);
 
 	public AbstractDataSet() {
 		super();
 		behaviours = new HashMap();
+		tags = new HashSet();
 	}
 
 	@Override
@@ -365,15 +372,15 @@ public abstract class AbstractDataSet implements IDataSet {
 				for (int i = 0; i < parameters.size(); i++) {
 					JSONObject parameter = parameters.get(i);
 					if (paramName.equals(parameter.optString("namePar"))) {
-						String[] values = paramValues.get(paramName).split(",");
 						boolean isMultiValue = parameter.optBoolean("multiValuePar");
-						int length = isMultiValue ? values.length : 1;
+						String paramValue = paramValues.get(paramName);
+						String[] values = isMultiValue ? paramValue.split(",") : Arrays.asList(paramValue).toArray(new String[0]);
 
 						String typePar = parameter.optString("typePar");
 						String delim = "string".equalsIgnoreCase(typePar) ? "'" : "";
 
 						List<String> newValues = new ArrayList<>();
-						for (int j = 0; j < length; j++) {
+						for (int j = 0; j < values.length; j++) {
 							String value = values[j].trim();
 							if (!value.isEmpty()) {
 								if (!value.startsWith(delim) && !value.endsWith(delim)) {
@@ -1034,7 +1041,12 @@ public abstract class AbstractDataSet implements IDataSet {
 
 	@Override
 	public UserProfile getUserProfile() {
-		return userProfile;
+		if (userProfile != null) {
+			return userProfile;
+		}
+		// if profile is not set into this dataset instance, try to get it from UserProfileManager
+		// TODO: user profile object is a mandatory object, it should be provided within constructor method for all datasets
+		return UserProfileManager.getProfile();
 	}
 
 	@Override
@@ -1092,12 +1104,23 @@ public abstract class AbstractDataSet implements IDataSet {
 	}
 
 	@Override
-	public void setDrivers(HashMap<String, Object> runtimeDrivers) {
+	public void setDrivers(Map<String, Object> runtimeDrivers) {
 		this.runtimeDrivers = runtimeDrivers;
 	}
 
 	@Override
-	public HashMap<String, Object> getDrivers() {
+	public Map<String, Object> getDrivers() {
 		return this.runtimeDrivers;
 	}
+
+	@Override
+	public Set getTags() {
+		return tags;
+	}
+
+	@Override
+	public void setTags(Set tags) {
+		this.tags = tags;
+	}
+
 }

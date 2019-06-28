@@ -1,6 +1,7 @@
 package it.eng.spagobi.analiticalmodel.document.handlers;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -10,7 +11,7 @@ import org.hibernate.HibernateException;
 
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.BIMetaModelParameter;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.MetaModelParuse;
-import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.ObjParview;
+import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.MetaModelParview;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.IBIMetaModelParameterDAO;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.IMetaModelParuseDAO;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.IMetaModelParviewDAO;
@@ -20,7 +21,7 @@ import it.eng.spagobi.commons.dao.DAOFactory;
 import it.eng.spagobi.tools.catalogue.bo.MetaModel;
 import it.eng.spagobi.utilities.exceptions.SpagoBIServiceException;
 
-public class BusinessModelDriverRuntime extends AbstractDriverRuntime {
+public class BusinessModelDriverRuntime extends AbstractDriverRuntime<BIMetaModelParameter> {
 
 	private static Logger logger = Logger.getLogger(BusinessModelDriverRuntime.class);
 
@@ -57,14 +58,11 @@ public class BusinessModelDriverRuntime extends AbstractDriverRuntime {
 		super.initAttributes(driver);
 	}
 
-	public void initDependencies(BIMetaModelParameter driver) {
-		super.initDataDependencies(driver);
-		super.initVisualDependencies(driver);
-		super.initLovDependencies(driver, DRIVER_BM_DAO.loadBIMetaModelParameterByMetaModelId(driver.getBiMetaModelID()));
-	}
-
+	@Override
 	public void initVisualDependencies(BIMetaModelParameter driver) {
-		super.initVisualDependencies(driver);
+		if (dependencies == null) {
+			dependencies = new HashMap<String, List<DriverDependencyRuntime>>();
+		}
 		try {
 			visualDependencies = VISUAL_DEPENDENCIES_BM_DAO.loadMetaModelParviews(driver.getId());
 		} catch (HibernateException e) {
@@ -72,12 +70,12 @@ public class BusinessModelDriverRuntime extends AbstractDriverRuntime {
 		}
 		Iterator it = visualDependencies.iterator();
 		while (it.hasNext()) {
-			ObjParview dependency = (ObjParview) it.next();
-			Integer objParFatherId = dependency.getParFatherId();
+			MetaModelParview dependency = (MetaModelParview) it.next();
+			Integer metaModelParFatherId = dependency.getParFatherId();
 			try {
-				BIMetaModelParameter objParFather = DRIVER_BM_DAO.loadBIMetaModelParameterById(objParFatherId);
+				BIMetaModelParameter metaModelParFather = DRIVER_BM_DAO.loadBIMetaModelParameterById(metaModelParFatherId);
 				VisualDependencyRuntime visualDependency = new VisualDependencyRuntime();
-				visualDependency.urlName = objParFather.getParameterUrlName();
+				visualDependency.urlName = metaModelParFather.getParameterUrlName();
 				visualDependency.condition = dependency;
 				if (!dependencies.containsKey(visualDependency.urlName)) {
 					dependencies.put(visualDependency.urlName, new ArrayList<DriverDependencyRuntime>());
@@ -85,13 +83,16 @@ public class BusinessModelDriverRuntime extends AbstractDriverRuntime {
 				List<DriverDependencyRuntime> depList = dependencies.get(visualDependency.urlName);
 				depList.add(visualDependency);
 			} catch (Exception e) {
-				throw new SpagoBIServiceException("An error occurred while loading parameter [" + objParFatherId + "]", e);
+				throw new SpagoBIServiceException("An error occurred while loading parameter [" + metaModelParFatherId + "]", e);
 			}
 		}
 	}
 
+	@Override
 	public void initDataDependencies(BIMetaModelParameter driver) {
-		super.initDataDependencies(driver);
+		if (dependencies == null) {
+			dependencies = new HashMap<String, List<DriverDependencyRuntime>>();
+		}
 		try {
 			dataDependencies = DATA_DEPENDENCIES_BM_DAO.loadMetaModelParuseById(driver.getId());
 		} catch (Exception e) {
@@ -122,7 +123,7 @@ public class BusinessModelDriverRuntime extends AbstractDriverRuntime {
 
 	@Override
 	public BIMetaModelParameter getDriver() {
-		return (BIMetaModelParameter) driver;
+		return driver;
 	}
 
 }

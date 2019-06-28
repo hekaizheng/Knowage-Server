@@ -26,6 +26,8 @@ import it.eng.spagobi.analiticalmodel.execution.bo.defaultvalues.DefaultValuesRe
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.AbstractDriver;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.AbstractParuse;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.AbstractParview;
+import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.BIMetaModelParameter;
+import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.BIObjectParameter;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.Parameter;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.ParameterUse;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.IBIMetaModelParameterDAO;
@@ -50,7 +52,7 @@ import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
 import it.eng.spagobi.utilities.exceptions.SpagoBIServiceException;
 
-public abstract class AbstractDriverRuntime {
+public abstract class AbstractDriverRuntime<T extends AbstractDriver> {
 	private static Logger logger = Logger.getLogger(AbstractDriverRuntime.class);
 	public static final String SERVICE_NAME = "GET_PARAMETERS_FOR_EXECUTION_SERVICE";
 
@@ -67,7 +69,7 @@ public abstract class AbstractDriverRuntime {
 	private IParameterDAO ANALYTICAL_DRIVER_DAO;
 
 	// attribute loaded from spagobi's metadata
-	AbstractDriver driver;
+	T driver;
 	Parameter analyticalDriver;
 	ParameterUse analyticalDriverExecModality;
 	List<AbstractParuse> dataDependencies;
@@ -136,7 +138,7 @@ public abstract class AbstractDriverRuntime {
 	public AbstractDriverRuntime() {
 	}
 
-	public AbstractDriverRuntime(AbstractDriver driver2, String exeRole, Locale loc, IDrivableBIResource doc, AbstractBIResourceRuntime dum,
+	public AbstractDriverRuntime(T driver2, String exeRole, Locale loc, IDrivableBIResource doc, AbstractBIResourceRuntime dum,
 			List<? extends AbstractDriver> objParameters) {
 		driver = driver2;
 		executionRole = exeRole;
@@ -153,7 +155,7 @@ public abstract class AbstractDriverRuntime {
 		objParameterIds = new ArrayList<Integer>();
 	}
 
-	public AbstractDriverRuntime(AbstractDriver driver2, String exeRole, Locale loc, IDrivableBIResource doc, boolean _isFromCross, boolean loadAdmissible,
+	public AbstractDriverRuntime(T driver2, String exeRole, Locale loc, IDrivableBIResource doc, boolean _isFromCross, boolean loadAdmissible,
 			AbstractBIResourceRuntime dum, List<AbstractDriver> objParameters) {
 		driver = driver2;
 		executionRole = exeRole;
@@ -212,24 +214,25 @@ public abstract class AbstractDriverRuntime {
 		enableMaximizer = analyticalDriverExecModality.isMaximizerEnabled();
 	}
 
-	private void initDependencies(AbstractDriver driver, List<? extends AbstractDriver> objParameters) {
+	private void initDependencies(T driver, List<? extends AbstractDriver> objParameters) {
 		initDataDependencies(driver);
 		initVisualDependencies(driver);
 		initLovDependencies(driver, objParameters);
 	}
 
-	public void initVisualDependencies(AbstractDriver driver) {
-		if (dependencies == null) {
-			dependencies = new HashMap<String, List<DriverDependencyRuntime>>();
-		}
-	}
+	public abstract void initVisualDependencies(T driver);
 
 	protected void initLovDependencies(AbstractDriver driver, List<? extends AbstractDriver> objParameters) {
 		if (dependencies == null) {
 			dependencies = new HashMap<String, List<DriverDependencyRuntime>>();
 		}
-		DocumentRuntime doc = new DocumentRuntime(UserProfileManager.getProfile(), locale);
-		ILovDetail lovDetail = doc.getLovDetail(driver);
+		AbstractBIResourceRuntime dum = null;
+		if (driver instanceof BIObjectParameter) {
+			dum = new DocumentRuntime(UserProfileManager.getProfile(), locale);
+		} else if (driver instanceof BIMetaModelParameter) {
+			dum = new BusinessModelRuntime(UserProfileManager.getProfile(), locale);
+		}
+		ILovDetail lovDetail = dum.getLovDetail(driver);
 		Set<String> lovParameters = null;
 		try {
 			if (lovDetail != null) {
@@ -263,11 +266,7 @@ public abstract class AbstractDriverRuntime {
 		}
 	}
 
-	public void initDataDependencies(AbstractDriver driver) {
-		if (dependencies == null) {
-			dependencies = new HashMap<String, List<DriverDependencyRuntime>>();
-		}
-	}
+	public abstract void initDataDependencies(T driver);
 
 	/**
 	 * Load admissible values from LOV done if not lookup and not manual input done if is from cross and not manual input
@@ -277,7 +276,7 @@ public abstract class AbstractDriverRuntime {
 		logger.debug("IN");
 		try {
 
-//			DocumentRuntime dum = new DocumentRuntime(UserProfileManager.getProfile(), locale);
+			// DocumentRuntime dum = new DocumentRuntime(UserProfileManager.getProfile(), locale);
 
 			// get LOV info
 			Integer paruseId = analyticalDriverExecModality.getUseID();
@@ -293,7 +292,12 @@ public abstract class AbstractDriverRuntime {
 
 			// check if to retrieve defaultValues, if it is not LOOKUP or if it is from Cross
 			boolean retrieveAdmissibleValue = false;
-			boolean lookupAndCrossCase = (isFromCross && ("LOOKUP".equalsIgnoreCase(selectionType)));
+			boolean lookupAndCrossCase = false;
+			if (driver instanceof BIObjectParameter) {
+				lookupAndCrossCase = (isFromCross && ("LOOKUP".equalsIgnoreCase(selectionType)));
+			} else if (driver instanceof BIMetaModelParameter) {
+				lookupAndCrossCase = ("LOOKUP".equalsIgnoreCase(selectionType));
+			}
 			logger.debug("Is lookup and cross case? " + lookupAndCrossCase);
 			boolean otherPreLoadCase = (("COMBOBOX".equalsIgnoreCase(selectionType) || "LIST".equalsIgnoreCase(selectionType)
 					|| "SLIDER".equalsIgnoreCase(selectionType) || "TREE".equalsIgnoreCase(selectionType)));
@@ -463,8 +467,8 @@ public abstract class AbstractDriverRuntime {
 
 	private List applyPostProcessingDependencies(List rows, AbstractBIResourceRuntime dum) {
 		Map selectedParameterValues = getSelectedParameterValuesAsMap();
-//		IEngUserProfile profile = UserProfileManager.getProfile();
-//		DocumentRuntime dum = new DocumentRuntime(profile, this.locale);
+		// IEngUserProfile profile = UserProfileManager.getProfile();
+		// DocumentRuntime dum = new DocumentRuntime(profile, this.locale);
 		List<AbstractParuse> biParameterExecDependencies = dum.getDependencies(driver, this.executionRole);
 		ILovDetail lovProvDet = dum.getLovDetail(driver);
 		if (lovProvDet instanceof DependenciesPostProcessingLov && selectedParameterValues != null && biParameterExecDependencies != null
@@ -560,7 +564,7 @@ public abstract class AbstractDriverRuntime {
 			IEngUserProfile profile = UserProfileManager.getProfile();
 			LovResultCacheManager executionCacheManager = new LovResultCacheManager();
 
-//			DocumentRuntime dum = new DocumentRuntime(UserProfileManager.getProfile(), locale);
+			// DocumentRuntime dum = new DocumentRuntime(UserProfileManager.getProfile(), locale);
 
 			lovResult = executionCacheManager.getLovResultDum(profile, dum.getLovDetail(driver), dum.getDependencies(driver, this.executionRole),
 					this.biResource, true, this.locale);
@@ -577,7 +581,7 @@ public abstract class AbstractDriverRuntime {
 	}
 
 	private boolean hasParameterInsideLOV(AbstractBIResourceRuntime dum) {
-//		DocumentRuntime dum = new DocumentRuntime(UserProfileManager.getProfile(), locale);
+		// DocumentRuntime dum = new DocumentRuntime(UserProfileManager.getProfile(), locale);
 		ILovDetail lovDetail = dum.getLovDetail(driver);
 		if (lovDetail != null) {
 			Set<String> parameterNames = null;
@@ -825,7 +829,7 @@ public abstract class AbstractDriverRuntime {
 		return driver;
 	}
 
-	public void setDriver(AbstractDriver driver) {
+	public void setDriver(T driver) {
 		this.driver = driver;
 	}
 

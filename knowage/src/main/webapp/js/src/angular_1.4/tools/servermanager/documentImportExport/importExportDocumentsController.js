@@ -43,7 +43,7 @@ app.factory("importExportDocumentModule_importConf", function() {
 
 
 app.controller('importExportController', ["$scope","sbiModule_translate","$mdToast",impExpFuncController]);
-app.controller('exportController', ['$http','sbiModule_download','sbiModule_device',"$scope", "$mdDialog", "$timeout", "sbiModule_logger", "sbiModule_translate","sbiModule_restServices","sbiModule_config","$mdToast","sbiModule_messaging",exportFuncController]);
+app.controller('exportController', ['$http','sbiModule_download','sbiModule_device',"$scope", "$mdDialog", "$timeout", "sbiModule_logger", "sbiModule_translate","sbiModule_restServices","sbiModule_config","$mdToast","sbiModule_messaging", "$filter", exportFuncController]);
 app.controller('importController', ['sbiModule_download','sbiModule_device',"$scope", "$mdDialog", "$timeout", "sbiModule_logger", "sbiModule_translate","sbiModule_restServices","sbiModule_config","$mdToast","importExportDocumentModule_importConf","sbiModule_messaging",importFuncController]);
 
 function impExpFuncController($scope,   sbiModule_translate ,$mdToast) {
@@ -157,28 +157,32 @@ function importFuncController(sbiModule_download,sbiModule_device,$scope, $mdDia
 
 
 }
+
 function exportFuncController($http,sbiModule_download,sbiModule_device,$scope, $mdDialog, $timeout, sbiModule_logger,
-		sbiModule_translate, sbiModule_restServices,sbiModule_config,$mdToast,sbiModule_messaging) {
+		sbiModule_translate, sbiModule_restServices,sbiModule_config,$mdToast,sbiModule_messaging, $filter) {
 
 	$scope.restServices = sbiModule_restServices;
 	$scope.download = sbiModule_download;
 	$scope.log = sbiModule_logger;
 	$scope.selected =[] ;
-	$scope.folders=[];
+	$scope.folders =[];
 	$scope.filterDate;
 	$scope.fileAssociation = {};
 	$scope.flags = {
 			waitExport : false,
 			viewDownload : false
 	}
-
+	var selectedFiles = [];
+	
 	$scope.checkboxs={
 			exportSubObj : false,
 			exportSnapshots : false,
 			exportCrossNav : false,
 			exportBirt : false,
-			exportScheduler : false
+			exportScheduler : false,
+			exportSelFunc: false
 	};
+	
 	$scope.filterDocuments = function(){
 		if($scope.filterDate!=undefined){
 			$scope.restServices.get("2.0", "folders","dateFilter="+$scope.filterDate)
@@ -218,17 +222,21 @@ function exportFuncController($http,sbiModule_download,sbiModule_device,$scope, 
 			$scope.log.error('GET RESULT error of ' + data + ' with status :' + status);
 		});
 	}
+	
 	$scope.restServices.get("2.0", "folders","includeDocs=true")
 	.success(function(data){
 		//if not errors in response, copy the data
 		if (data.errors === undefined){
 //			$scope.folders=angular.copy(data);
 			for (d in data){
+				
 				if (data[d].codType != "USER_FUNCT"){
 					//doesn't add personal folders to the tree
 					$scope.folders.push(data[d]);
 				}
 			}
+			
+			//tempFolders = angular.copy($scope.folders);
 		}else{
 			$scope.folders=[];
 		}
@@ -237,20 +245,79 @@ function exportFuncController($http,sbiModule_download,sbiModule_device,$scope, 
 		$scope.folders=angular.copy(foldersJson);
 		$scope.log.error('GET RESULT error of ' + data + ' with status :' + status);
 	});
+	
+	$scope.filterByStatus = {
+			development: "",
+			test: "",
+			released: ""
+	};
+	
+	function filteringDocuments(object) {
+		
+		var value = "";
+		for(var key in object) 
+			value += object[key];
+		return value;
+	}
+	
+	$scope.filterDoc = function() {
+		$scope.test = filteringDocuments($scope.filterByStatus);
+	}
+	
+	
+	var goingThroughTree = function(folders) {
+		var checkedDocs = [];
+		var objArray = [];
+		
+		for(var i=0; i<folders.length; i++) {
+			checkedDocs = $filter('filter')(folders[i].biObjects, {checked: true}, true);
+			objArray = setObjectPath(folders[i].path, checkedDocs);
+			if(folders[i].subfolders.length > 0)
+				goingThroughTree(folders[i].subfolders);
+		}
+	}
+	
+	var setObjectPath = function(paths, checkedDocs) {
+		
+		var singlePath = [paths];
+		
+		for(var i=0; i<checkedDocs.length; i++) {
+			checkedDocs[i].functionalities = singlePath;
+			var obj = {"id": checkedDocs[i].id, "folder": paths}
+			selectedFiles.push(obj);
+		}
+	}
 
 	$scope.exportFiles= function(){
-		var config={"DOCUMENT_ID_LIST":[],
+		
+		var config={
+				"DOCUMENT_ID_LIST":[],
 				"EXPORT_FILE_NAME":$scope.exportName,
 				"EXPORT_SUB_OBJ":$scope.checkboxs.exportSubObj,
 				"EXPORT_SNAPSHOT":$scope.checkboxs.exportSnapshots,
 				"EXPORT_CROSSNAV":$scope.checkboxs.exportCrossNav,
 				"EXPORT_BIRT": $scope.checkboxs.exportBirt,
-				"EXPORT_SCHEDULER": $scope.checkboxs.exportScheduler};
-
-		for (var i =0 ; i < $scope.selected.length;i++){
-			if ($scope.selected[i].type == "biObject"){
-				config.DOCUMENT_ID_LIST.push(""+$scope.selected[i].id);
+				"EXPORT_SCHEDULER": $scope.checkboxs.exportScheduler,
+				"EXPORT_SELECTED_FUNCTIONALITY": $scope.checkboxs.exportSelFunc
+		};
+		
+		goingThroughTree($scope.folders);
+		
+		if(!$scope.checkboxs.exportSelFunc){
+			for (var i =0 ; i < $scope.selected.length;i++){
+				if ($scope.selected[i].type == "biObject")
+					config.DOCUMENT_ID_LIST.push(""+$scope.selected[i].id);
 			}
+		}
+		
+		if($scope.checkboxs.exportSelFunc) {
+			config.DOCUMENT_ID_LIST = [];
+			for(var i=0; i<selectedFiles.length; i++) {
+				//if($scope.selected[i].type == "biObject") {
+					config.DOCUMENT_ID_LIST.push(selectedFiles[i]);
+				//}
+			}
+			
 		}
 
 		$scope.flags.waitExport=true;
@@ -268,7 +335,6 @@ function exportFuncController($http,sbiModule_download,sbiModule_device,$scope, 
 //			$scope.showToast("ERRORS "+status,4000);
 //		})
 
-
 		sbiModule_restServices.promisePost("1.0/serverManager/importExport/document","export",config)
 		.then(function(response) {
 			if (response.data.hasOwnProperty("errors")) {
@@ -285,12 +351,11 @@ function exportFuncController($http,sbiModule_download,sbiModule_device,$scope, 
 
 
 	}
+	
 
 	$scope.submitDownForm = function(form){
 		$scope.flags.submitForm= true;
 	}
-
-
 
 	$scope.toggleViewDownload = function(){
 		$scope.flags.viewDownload = !$scope.flags.viewDownload;
@@ -323,9 +388,6 @@ function exportFuncController($http,sbiModule_download,sbiModule_device,$scope, 
 			sbiModule_restServices.errorHandler(response.data.errors[0].message,"sbi.generic.toastr.title.error");
 		});
 
-
-
-
 	}
 
 	$scope.showAlert = function (title, message){
@@ -341,7 +403,5 @@ function exportFuncController($http,sbiModule_download,sbiModule_device,$scope, 
 	$scope.debug= function(){
 		//$scope.isEnabled = !$scope.isEnabled;
 	}
-
-
-
+	
 }

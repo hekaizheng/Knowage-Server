@@ -40,31 +40,34 @@ angular.module('cockpitModule')
 	                	elems.push(dsLabel);
 	                }
 
-	                scope.checkPlaceholders= function(counter, refreshBool){
-
-	                	if(counter == 0 && refreshBool != undefined && refreshBool == true){
-	                		html = scope.ngModel.content.text;
-	                	}
-
-	                	if (counter < elems.length){
-	                		// call this only if reference is really contained
-	                		if(html.indexOf(elems[counter])>=0){
-	                			cockpitModule_datasetServices.substitutePlaceholderValues(html, elems[counter], model).then(function(htmlReturned){
-	                				html = htmlReturned;
-	                				ele.html(html);
-	                				$compile(ele.contents())(scope);
-	                				counter++;
-	                				scope.checkPlaceholders(counter);
-	                			},function(error){
-	                			});
-	                		}
-	                		else{
-	                			counter++;
-	                			scope.checkPlaceholders(counter);
-	                		}
-	                	}else{
-	                		scope.ngModel.isReady=true; //view the content replaced
-	                	}
+	                scope.checkPlaceholders= function(counter, refreshBool,callback){
+		                	if(counter == 0 && refreshBool != undefined && refreshBool == true){
+		                		html = scope.ngModel.content.text;
+		                	}
+	
+		                	if (counter < elems.length){
+		                		// call this only if reference is really contained
+		                		if(html.indexOf(elems[counter])>=0){
+		                			cockpitModule_datasetServices.substitutePlaceholderValues(html, elems[counter], model).then(function(htmlReturned){
+		                				html = htmlReturned;
+		                				ele.html(html);
+		                				$compile(ele.contents())(scope);
+		                				counter++;
+		                				scope.checkPlaceholders(counter, null, callback);
+		                			},function(error){
+		                			});
+		                		}
+		                		else{
+		                			counter++;
+		                			scope.checkPlaceholders(counter, null, callback);
+		                		}
+		                	}else{
+		                		scope.ngModel.isReady=true; //view the content replaced
+		                		if (callback && typeof callback === "function") {
+		                			return callback();
+		                		}
+		                	}
+	                
 	                }
 
 	                scope.checkPlaceholders(0);
@@ -101,14 +104,14 @@ angular.module('cockpitModule')
 	   };
 });
 
-function cockpitTextWidgetControllerFunction($scope,cockpitModule_widgetConfigurator,cockpitModule_datasetServices,sbiModule_translate,$q,$mdPanel){
+function cockpitTextWidgetControllerFunction($scope,cockpitModule_widgetConfigurator,cockpitModule_properties,cockpitModule_datasetServices,sbiModule_translate,$q,$mdPanel,$timeout){
 
 	$scope.property={style:{}};
 	$scope.init=function(element,width,height){
-	//	$scope.refreshWidget();
+		$scope.refreshWidget(null,'init');
 	};
 
-	$scope.refresh=function(element,width,height){
+	$scope.refresh=function(element,width,height,data, nature){
 
 		var fontSize = 0;
 		var textLength = 0;
@@ -125,7 +128,14 @@ function cockpitTextWidgetControllerFunction($scope,cockpitModule_widgetConfigur
 		$scope.property.style["font-size"]= fontSize+"px";
 		$scope.property.style["line-height"]= fontSize+"px";
 
-		$scope.checkPlaceholders(0, true);
+		if($scope.checkPlaceholders) $scope.checkPlaceholders(0, true);
+		if(nature == 'init'){
+			$timeout(function(){
+				$scope.widgetIsInit=true;
+				cockpitModule_properties.INITIALIZED_WIDGETS.push($scope.ngModel.id);
+			},500);
+		}
+		
 
 	};
 

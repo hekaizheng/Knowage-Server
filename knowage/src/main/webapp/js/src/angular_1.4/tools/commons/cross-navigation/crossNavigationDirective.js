@@ -69,6 +69,86 @@ angular.module('cross_navigation', ['ngMaterial','bread_crumb','angular_table'])
 						return;
 					}
 				}
+				console.log("outputParameter: ", outputParameter);
+				console.log("inputParameter: ", inputParameter);
+				console.log("otherOutputParameters: ", otherOutputParameters);
+
+				for (var n in navObj){
+					if (navObj[n].crossText){
+						//replace parameters placeholders if exist in navigation popup selection
+						var paramsRegex = /\$P\{([a-zA-Z0-9\_\-]*)}/g;
+						navObj[n].crossText = navObj[n].crossText.replace(paramsRegex,function(match,p1){
+							if (Array.isArray(outputParameter)){
+								for (o in outputParameter){
+									for(var name in outputParameter[o]){
+										if (name == p1)
+											return outputParameter[o][name] || '';
+									}
+								}
+							}else if(outputParameter[p1]) return outputParameter[p1];
+
+							if (Array.isArray(inputParameter)){
+								for (o in inputParameter){
+									for(var name in inputParameter[o]){
+										if (inputParameter[o].label == p1)
+											return inputParameter[o].parameterValue || '';
+									}
+								}
+							}else if(inputParameter[p1]) return inputParameter[p1];
+
+							if (Array.isArray(otherOutputParameters)){
+								for (o in otherOutputParameters){
+									for(var name in otherOutputParameters[o]){
+										if (name == p1)
+											return otherOutputParameters[o][name] || '';
+									}
+								}
+								return ""; //clean placeholder
+							}else if(otherOutputParameters[p1]) return otherOutputParameters[p1];
+							return match;
+						});
+					}else{
+						navObj[n].crossText = navObj[n].crossName; //default: force the crossName
+					}
+
+					if (navObj[n].crossBreadcrumb){
+						//replace parameters placeholders if exist in breadcrumbs
+						var paramsRegex = /\$P\{([a-zA-Z0-9\_\-]*)}/g;
+						navObj[n].crossBreadcrumb = navObj[n].crossBreadcrumb.replace(paramsRegex,function(match,p1){
+							if (Array.isArray(outputParameter)){
+								for (o in outputParameter){
+									for(var name in outputParameter[o]){
+										if (name == p1)
+											return outputParameter[o][name] || '';
+									}
+								}
+							}else if(outputParameter[p1]) return outputParameter[p1];
+
+							if (Array.isArray(inputParameter)){
+								for (o in inputParameter){
+									for(var name in inputParameter[o]){
+										if (inputParameter[o].label == p1)
+											return inputParameter[o].parameterValue || '';
+									}
+								}
+							}else if(inputParameter[p1]) return inputParameter[p1];
+
+							if (Array.isArray(otherOutputParameters)){
+								for (o in otherOutputParameters){
+									for(var name in otherOutputParameters[o]){
+										if (name == p1)
+											return otherOutputParameters[o][name] || '';
+									}
+								}
+								return ""; //clean placeholder
+							}else if(otherOutputParameters[p1]) return otherOutputParameters[p1];
+							return match;
+						});
+					}else{
+						navObj[n].crossBreadcrumb = navObj[n].document.name; //default: force the docName as old management
+					}
+				}
+
 
 
 				if(navObj.length==1){
@@ -103,7 +183,12 @@ angular.module('cross_navigation', ['ngMaterial','bread_crumb','angular_table'])
 					    	  +'	</div>'
 					    	  +'</md-toolbar>'
 					    	  +'<md-dialog-content>'
-					    	  +'	<angular-table flex id="selectDoctableCross" no-pagination="true" ng-model=documents columns="[{label:\'Label\',name:\'document.label\'},{label:\'Name\',name:\'document.name\'},{label:\'Description\',name:\'document.description\'}]" click-function="selectDocument(item);"></angular-table>'
+//					    	  +'	<angular-table flex id="selectDoctableCross" no-pagination="true" ng-model=documents columns="[{label:\'Label\',name:\'document.label\'},{label:\'Name\',name:\'document.name\'},{label:\'Description\',name:\'document.description\'}]" click-function="selectDocument(item);"></angular-table>'
+					    	  +'	<md-list class="md-dense" flex id="selectDoctableCross"  ng-model=documents >'
+				              +'	  <md-list-item class="md-2-line" ng-repeat="item in documents" ng-click="selectDocument(item);">'
+			                  +'  		<div class="md-list-item-text">{{(item.crossText) ? item.crossText : item.document.name}}</div>'
+			                  +'	  </md-list-item>'
+			                  +'	</md-list>'
 					    	  +'</md-dialog-content>'
 					    	  +'<md-dialog-actions layout="row">'
 					    	  +'	<span flex></span>'
@@ -112,21 +197,14 @@ angular.module('cross_navigation', ['ngMaterial','bread_crumb','angular_table'])
 					    	  +'</md-dialog>',
 					      clickOutsideToClose:false,
 					      locals:{documents:navObj,
-					    	  translate:sbiModule_translate}
+					    	  	  translate:sbiModule_translate}
 					    })
 					    .then(function(doc) {
 					    	execCross(doc,outputParameter,inputParameter,true,otherOutputParameters);
 					    }, function() {
 					     return;
 					    });
-
-
 				}
-
-
-
-
-
 			},function(response){
 				sbiModule_restServices.errorHandler(response.data, "Errors while attempt to open target document")
 			})
@@ -151,8 +229,8 @@ angular.module('cross_navigation', ['ngMaterial','bread_crumb','angular_table'])
 			targetUrl= sbiModule_config.contextName
 			+ '/restful-services/publish?PUBLISHER=/WEB-INF/jsp/tools/documentexecution/documentExecutionNg.jsp'
 			+ '&OBJECT_ID=' + doc.document.id
-			+ '&OBJECT_LABEL=' + doc.document.label
-			+ '&SELECTED_ROLE=' + selectedRole.name
+			+ '&OBJECT_LABEL=' + encodeURIComponent(doc.document.label)
+			+ '&SELECTED_ROLE=' + encodeURIComponent(selectedRole.name)
 			+ '&SBI_EXECUTION_ID=null'
 			+ '&OBJECT_NAME=' + encodeURIComponent(doc.document.name)
 			+"&CROSS_PARAMETER="+parameterStr;
@@ -188,7 +266,8 @@ angular.module('cross_navigation', ['ngMaterial','bread_crumb','angular_table'])
 				    })
 			} else {
 				// normal cross navigation
-				cns.crossNavigationSteps.stepControl.insertBread({name:doc.document.name,label:doc.document.label,id:doc.document.id,url:targetUrl});
+//				cns.crossNavigationSteps.stepControl.insertBread({name:doc.document.name,label:doc.document.label,id:doc.document.id,url:targetUrl});
+				cns.crossNavigationSteps.stepControl.insertBread({name:doc.crossBreadcrumb,label:doc.document.label,id:doc.document.id,url:targetUrl});
 			}
 		};
 
@@ -287,10 +366,6 @@ angular.module('cross_navigation', ['ngMaterial','bread_crumb','angular_table'])
 		}
 
 
-
-
-
-
 		function parseParameterValue(param,value){
 			//TO-DO verificare i tuipi numerici se sono interi o double
 			//mettere i try catch
@@ -339,9 +414,11 @@ angular.module('cross_navigation', ['ngMaterial','bread_crumb','angular_table'])
 		function jsonToURI(jsonObj){
 			return encodeURIComponent(JSON.stringify(jsonObj))
 			.replace(/'/g,"%27")
-			.replace(/"/g,"%22")
-			.replace(/%3D/g,"=")
-			.replace(/%26/g,"&");
+			.replace(/"/g,"%22");
+//			.replace(/'/g,"%27")
+//			.replace(/"/g,"%22")
+//			.replace(/%3D/g,"=")
+//			.replace(/%26/g,"&");
 		}
 
 		this.internalNavigateTo=function(params,targetDocLabel){

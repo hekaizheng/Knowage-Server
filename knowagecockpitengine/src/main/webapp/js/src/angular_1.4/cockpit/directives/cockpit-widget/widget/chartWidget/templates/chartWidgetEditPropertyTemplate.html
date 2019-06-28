@@ -8,12 +8,12 @@
 		</md-toolbar>
 		<md-content flex layout="column">
 		   
-			<md-tabs flex md-border-bottom>
+			<md-tabs flex md-border-bottom class="chartConfigContainer">
 		  
 		  		<md-tab label="{{translate.load('sbi.cockpit.dataset')}}">
 		  			<md-card>
 	        			<md-card-content layout="row">
-		   					<dataset-selector flex ng-model="localModel.datasetId" on-change="handleEvent('datasetChanged',dsId)" dataset-type-exclusion="[{type:'SbiSolrDataSet',configuration:{property:'solrType',value:'DOCUMENTS'}}]"></dataset-selector>
+		   					<dataset-selector flex ng-model="localModel.datasetId" on-change="handleEvent('datasetChanged',dsId)"></dataset-selector>
 		     			</md-card-content>
 	     			</md-card>
 		     	</md-tab>

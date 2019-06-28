@@ -26,16 +26,16 @@
 		var documentExecuteServicesObj = {
 
 
-				decodeRequestStringToJson: function (str) {
-					var parametersJson = {};
-
-					var arrParam = str.split('%26');
-					for(var i=0; i<arrParam.length; i++){
-						var arrJsonElement = arrParam[i].split('%3D');
-						parametersJson[arrJsonElement[0]]=arrJsonElement[1];
-					}
-					return parametersJson;
-				},
+//				decodeRequestStringToJson: function (str) {
+//					var parametersJson = {};
+//
+//					var arrParam = str.split('%26');
+//					for(var i=0; i<arrParam.length; i++){
+//						var arrJsonElement = arrParam[i].split('%3D');
+//						parametersJson[arrJsonElement[0]]=arrJsonElement[1];
+//					}
+//					return parametersJson;
+//				},
 
 				showToast: function(text, time) {
 					var timer = time == undefined ? 6000 : time;
@@ -337,7 +337,10 @@
 					"label=" + execProperties.executionInstance.OBJECT_LABEL + "&role="+ execProperties.selectedRole.name)
 					.success(function(data, status, headers, config) {
 						console.log('data viewpoints '  ,  data.viewpoints);
-						serviceScope.gvpCtrlViewpoints = data.viewpoints;
+//						serviceScope.gvpCtrlViewpoints = data.viewpoints;
+						driversExecutionService.gvpCtrlViewpoints = data.viewpoints;
+						// angular.copy(data.viewpoints,driversExecutionService.gvpCtrlViewpoints);
+
 //						execProperties.showParametersPanel.status = false;
 						if($mdSidenav('parametersPanelSideNav').isOpen()) {
 							docExecute_paramRolePanelService.toggleParametersPanel(false);
@@ -745,7 +748,7 @@
 			$mdDialog.show({
 				//scope : serviceScope,
 				preserveScope : true,
-				templateUrl : sbiModule_config.contextName + '/js/src/angular_1.4/tools/glossary/commons/templates/dialog-new-parameters-document-execution.html',
+				templateUrl : sbiModule_config.dynamicResourcesBasePath + '/angular_1.4/tools/glossary/commons/templates/dialog-new-parameters-document-execution.html',
 				controllerAs : 'vpCtrl',
 				controller : function($mdDialog) {
 					var vpctl = this;
@@ -786,8 +789,8 @@
 					};
 				},
 
-				templateUrl : sbiModule_config.contextName
-				+ '/js/src/angular_1.4/tools/documentexecution/templates/dialog-new-parameters-document-execution.html'
+				templateUrl : sbiModule_config.dynamicResourcesBasePath
+				+ '/angular_1.4/tools/documentexecution/templates/dialog-new-parameters-document-execution.html'
 			});
 		};
 
@@ -811,50 +814,36 @@
 		};
 
 		this.isExecuteParameterDisabled = function() {
-			if(execProperties.parametersData.documentParameters.length > 0) {
-				for(var i = 0; i < execProperties.parametersData.documentParameters.length; i++ ) {
-
-//					if(execProperties.parametersData.documentParameters[i].mandatory
-//					&& (!execProperties.parametersData.documentParameters[i].parameterValue
-//					|| execProperties.parametersData.documentParameters[i].parameterValue == '' )) {
-//					return true;
-//					}
-
-					if(execProperties.parametersData.documentParameters[i].mandatory){
-						if(execProperties.parametersData.documentParameters[i].type=='DATE_RANGE'){
-							if(!execProperties.parametersData.documentParameters[i].parameterValue
-									|| execProperties.parametersData.documentParameters[i].parameterValue == ''
-										|| typeof execProperties.parametersData.documentParameters[i].datarange ==='undefined'
-											|| execProperties.parametersData.documentParameters[i].datarange.opt==''
-							){
-								return true;
-							}
-						}else{
-							if(!execProperties.parametersData.documentParameters[i].parameterValue
-									|| execProperties.parametersData.documentParameters[i].parameterValue == ''){
-								return true;
-							}
-
-						}
-					}
+			for(var i = 0; i < execProperties.parametersData.documentParameters.length; i++) {
+				if(execProperties.parametersData.documentParameters[i].mandatory && (typeof execProperties.parametersData.documentParameters[i].parameterValue === 'undefined' || execProperties.parametersData.documentParameters[i].parameterValue == '')){
+					return true;
 				}
 			}
-			return false
+			return false;
 		};
 
 		this.toggleParametersPanel = function(open) {
+
+			function toggleNewPanel(opened){
+				 if(document.getElementById("parametersPanelSideNav-e")){
+					 if(opened==undefined) $mdSidenav('parametersPanelSideNav-e').toggle();
+					 if(opened) $mdSidenav('parametersPanelSideNav-e').open();
+					 if(opened == false) $mdSidenav('parametersPanelSideNav-e').close();
+				 }
+			 }
+
 			$timeout(function(){
 				if(open==undefined){
 					execProperties.showParametersPanel.status=!execProperties.showParametersPanel.status;
-//					$mdSidenav('parametersPanelSideNav').toggle();
+					toggleNewPanel();
 				}else if(open){
 					execProperties.showParametersPanel.status=true;
-//					$mdSidenav('parametersPanelSideNav').open();
+					toggleNewPanel(true);
 				}else if(!open){
 					execProperties.showParametersPanel.status=false;
-//					$mdSidenav('parametersPanelSideNav').close();
+					toggleNewPanel(false);
 				}
-			},0);
+			}, document.getElementById("parametersPanelSideNav-e") ? 0 : 500);
 		};
 	});
 

@@ -27,7 +27,7 @@ app.directive('chartstructureTab', function(sbiModule_config) {
 			restrict: 'AE',
 			replace: true,
 			templateUrl: function(){
-			      return sbiModule_config.contextName + '/js/src/angular_1.4/chart/designer/directives/custom_directives/structure-tab/chartstructure-tab.html'
+			      return sbiModule_config.dynamicResourcesEnginePath + '/angular_1.4/chart/designer/directives/custom_directives/structure-tab/chartstructure-tab.html'
 		      },
 			controller: structureTabControllerFunction
 		}
@@ -57,6 +57,14 @@ function structureTabControllerFunction($scope,sbiModule_translate,sbiModule_res
 		if(!newValue && $scope.chartTemplate) $scope.chartTemplate.categoryDate = "";
 	},true)
 
+	$scope.$watch('categories[0].orderColumn',function(newValue, oldValue){
+
+		if(oldValue && newValue != oldValue && $scope.categories[0].orderColumn != $scope.categories[0].name){
+			sbiModule_messaging.showWarningMessage(sbiModule_translate.load("sbi.cockpit.widget.warning.message"), 'Warning');
+
+		}
+
+	})
 
 	$scope.isInvalid = function (series) {
 
@@ -383,7 +391,7 @@ function structureTabControllerFunction($scope,sbiModule_translate,sbiModule_res
 						base = StructureTabService.getGaugeTemplate();
 						break;
 					case 'line':
-						base = StructureTabService.getBaseTemplate();
+						base = StructureTabService.getBaseTemplate($scope.selectedChartType);
 						break;
 					case 'heatmap':
 						base = StructureTabService.getHeatmapTemplate();
@@ -392,10 +400,10 @@ function structureTabControllerFunction($scope,sbiModule_translate,sbiModule_res
 						base = StructureTabService.getRadarTemplate();
 						break;
 					case 'bar':
-						base = StructureTabService.getBaseTemplate();
+						base = StructureTabService.getBaseTemplate($scope.selectedChartType);
 						break;
 					case 'pie':
-						base = StructureTabService.getBaseTemplate();
+						base = StructureTabService.getBaseTemplate($scope.selectedChartType);
 						break;
 					case 'chord':
 						base = StructureTabService.getChordTemplate();
@@ -588,16 +596,16 @@ function structureTabControllerFunction($scope,sbiModule_translate,sbiModule_res
 					if (categoryTag.groupby.indexOf(",") > -1) {
 
 						//and groupbyNames is an array
-						if(categoryTag.groupbyNames.indexOf(",") > -1) {
+						if (categoryTag.groupbyNames.indexOf(",") > -1) {
 
 							$scope.categories.push({column:categoryTag.column,groupby:"", groupbyNames:"",name:categoryTag.name, orderColumn:categoryTag.orderColumn,orderType:categoryTag.orderType,stacked:"",stackedType:""});
 
-							var groupBySplitArray = categoryTag.groupby.split(",");
+							var groupBySplitArray = categoryTag.groupby.split(", ");
 							for (i=0; i<groupBySplitArray.length; i++) {
 
 								var obj = {column:"", groupby:"", groupbyNames:"", name:"", orderColumn:"", orderType:"", stacked:"", stackedType:""};
 								obj.column = groupBySplitArray[i];
-								var groupByNameSplitArray = categoryTag.groupbyNames.split(",");
+								var groupByNameSplitArray = categoryTag.groupbyNames.split(", ");
 								for (var j = 0; j < groupByNameSplitArray.length; j++) {
 									if(j==i){
 										obj.name = groupByNameSplitArray[j];
@@ -616,7 +624,7 @@ function structureTabControllerFunction($scope,sbiModule_translate,sbiModule_res
 							$scope.categories.push({column:categoryTag.column,groupby:"", groupbyNames:"",name:categoryTag.name, orderColumn:"",orderType:"",stacked:"",stackedType:""});
 
 							var gbnCounter = 0;
-							var groupBySplitArray = categoryTag.groupby.split(",");
+							var groupBySplitArray = categoryTag.groupby.split(", ");
 							for (i=0; i<groupBySplitArray.length; i++) {
 								var obj = {column:"", groupby:"", groupbyNames:"", name:"", orderColumn:"", orderType:"", stacked:"", stackedType:""};
 								//check if grpupByName is empty and case for first situation
@@ -653,6 +661,17 @@ function structureTabControllerFunction($scope,sbiModule_translate,sbiModule_res
 								 $scope.categories.push({column:categoryTag.groupby,groupby:"", groupbyNames:"",name:categoryTag.groupbyNames, orderColumn:"",orderType:"",stacked:"",stackedType:""});
 							 }
 						}
+					}
+
+					if(!$scope.chartTemplate.VALUES.CATEGORY.drillOrder){
+						$scope.chartTemplate.VALUES.CATEGORY.drillOrder={}
+
+						for (var j = 0; j <  $scope.categories.length; j++) {
+
+							$scope.chartTemplate.VALUES.CATEGORY.drillOrder[$scope.categories[j].column] = {orderColumn:$scope.categories[j].orderColumn, orderType:$scope.categories[j].orderType};
+
+						}
+
 					}
 				}
 			}
@@ -753,6 +772,8 @@ function structureTabControllerFunction($scope,sbiModule_translate,sbiModule_res
 	}
 
 	$scope.categoryRemove = function(indexOfItem) {
+		if($scope.chartTemplate.VALUES.CATEGORY.drillOrder)
+		delete $scope.chartTemplate.VALUES.CATEGORY.drillOrder[$scope.categories[indexOfItem].column];
 		$scope.categories.splice(indexOfItem,1);
 	}
 
@@ -954,6 +975,10 @@ function structureTabControllerFunction($scope,sbiModule_translate,sbiModule_res
 		}
 
 	}
+
+	$scope.clearAxisMajorGridDetails = function () {
+				$scope.axisForDisplay.MAJORGRID = {"interval": "","style": {"typeLine": "","color": ""}}
+			}
 
 	$scope.removeSeriesContainer = function(seriesContainer) {
 

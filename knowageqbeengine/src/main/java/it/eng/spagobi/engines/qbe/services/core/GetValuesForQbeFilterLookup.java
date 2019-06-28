@@ -29,6 +29,7 @@ import org.jgrapht.Graph;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.json.JSONObjectDeserializator;
 
 import com.jamonapi.Monitor;
 import com.jamonapi.MonitorFactory;
@@ -59,6 +60,7 @@ import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.engines.EngineConstants;
 import it.eng.spagobi.utilities.engines.SpagoBIEngineServiceException;
 import it.eng.spagobi.utilities.engines.SpagoBIEngineServiceExceptionHandler;
+import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
 import it.eng.spagobi.utilities.service.JSONSuccess;
 
 public class GetValuesForQbeFilterLookup extends AbstractQbeEngineAction {
@@ -75,6 +77,8 @@ public class GetValuesForQbeFilterLookup extends AbstractQbeEngineAction {
 	public static String MODE_COMPLETE = "complete";
 	public static String START = "start";
 	public static String LIMIT = "limit";
+
+	public static final String DRIVERS = "DRIVERS";
 
 	// logger component
 	private static Logger logger = Logger.getLogger(GetValuesForQbeFilterLookup.class);
@@ -200,6 +204,18 @@ public class GetValuesForQbeFilterLookup extends AbstractQbeEngineAction {
 				}
 				dataSet.addBinding("attributes", userAttributes);
 				dataSet.addBinding("parameters", this.getEnv());
+
+				Map<String, Object> envs = getEnv();
+				String stringDrivers = envs.get(DRIVERS).toString();
+				Map<String, Object> drivers = null;
+				try {
+					drivers = JSONObjectDeserializator.getHashMapFromString(stringDrivers);
+				} catch (Exception e) {
+					logger.debug("Drivers cannot be transformed from string to map");
+					throw new SpagoBIRuntimeException("Drivers cannot be transformed from string to map", e);
+				}
+				dataSet.setDrivers(drivers);
+
 				dataSet.loadData((start == null) ? -1 : start.intValue(), (limit == null) ? -1 : limit.intValue(), (maxSize == null) ? -1 : maxSize.intValue());
 
 				dataStore = dataSet.getDataStore();

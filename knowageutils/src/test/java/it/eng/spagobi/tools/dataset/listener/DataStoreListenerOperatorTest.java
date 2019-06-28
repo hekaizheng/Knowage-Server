@@ -19,9 +19,9 @@ package it.eng.spagobi.tools.dataset.listener;
 
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -759,15 +759,27 @@ public class DataStoreListenerOperatorTest extends TestCase {
 		}
 
 		@Override
-		public HashMap<String, Object> getDrivers() {
+		public Map<String, Object> getDrivers() {
 
 			return getDrivers();
 		}
 
 		@Override
-		public void setDrivers(HashMap<String, Object> drivers) {
+		public void setDrivers(Map<String, Object> drivers) {
 
 			setDrivers(drivers);
+		}
+
+		@Override
+		public Set getTags() {
+			// TODO Auto-generated method stub
+			return null;
+		}
+
+		@Override
+		public void setTags(Set tags) {
+			// TODO Auto-generated method stub
+
 		}
 
 	}

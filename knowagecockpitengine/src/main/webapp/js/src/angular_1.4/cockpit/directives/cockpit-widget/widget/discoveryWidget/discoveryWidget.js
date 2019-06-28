@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 						pre: function preLink(scope, element, attrs, ctrl, transclud) {},
 						post: function postLink(scope, element, attrs, ctrl, transclud) {
 							element.ready(function () {
+								//scope.showWidgetSpinner();
 								scope.initWidget();
-								scope.showWidgetSpinner();
 							});
 						}
 					};
@@ -41,12 +41,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 			$rootScope,
 			$timeout,
 			$mdPanel,
+			$mdDialog,
 			$q,
 			$filter,
 			sbiModule_translate,
 			cockpitModule_widgetConfigurator,
 			cockpitModule_widgetSelection,
 			cockpitModule_generalServices,
+			cockpitModule_properties,
 			cockpitModule_template){
 		
 		$scope.template = cockpitModule_template;
@@ -85,18 +87,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 			return obj;
 		}
 		
-		$scope.ngModel.search = {};
+		$scope.ngModel.search = {
+//				facets : [
+//					{
+//						name: 'col',
+//						value: ['a','b']
+//					},{...}
+//				]
+		};
 		$scope.facets = [];
 		
 		$scope.gridOptions = {
+			angularCompileRows: true,
             enableColResize: true,
             enableSorting: true,
             onGridReady: resizeColumns,
             onGridSizeChanged: resizeColumns,
             onSortChanged: changeSorting,
             getRowHeight: rowHeight,
-            onCellClicked: handleClick
+            onCellClicked: handleClick,
+            getRowHeight: getRowHeight,
+            stopEditingWhenGridLosesFocus:true
 		};
+		
+		function getRowHeight(params){
+			var maxLength = 0;
+			for(var r in params.data){
+				if(params.data[r].length > maxLength) maxLength = params.data[r].length;
+			}
+	        return !params.node.rowPinned ? 28 * Math.min((Math.floor(maxLength / 80) + 1),3) : 28;
+		}
 		
 		function changeSorting(){
 			$scope.showWidgetSpinner()
@@ -115,6 +135,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		}
 		
 		function handleClick(node){
+			if(node.colDef.paramType == 'text'){
+				$mdDialog.show({
+					template: 	'<md-dialog class="textContainerDialog">'+
+									'<md-dialog-content>'+
+										'<p ng-bind-html="dialogContent"></p>'+
+									'</md-dialog-content>'+
+									'<md-dialog-actions>'+
+										'<md-button class="md-primary md-button" ng-click="hide()">Close</button>'+
+									'</md-dialog-actions>'+
+								'</md-dialog>' ,
+					parent : angular.element(document.body),
+					clickOutsideToClose:true,
+					escapeToClose: true,
+					preserveScope: false,
+					locals:{value:node.value},
+					controller: function(scope,$mdDialog,value){
+						scope.dialogContent = value;
+						scope.hide = function(){
+							$mdDialog.hide();
+						}
+					}
+				});
+				return;
+			};
 	  		$scope.doSelection(node.colDef.headerName,node.value,null,null,node.data, null);
 	  	}
 		
@@ -127,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		}
 		
 		$scope.refresh = function(element,width,height, datasetRecords,nature) {
+			$scope.showWidgetSpinner();
 			if(datasetRecords){
 				$scope.facets = datasetRecords.facets;
 				$scope.metaData = datasetRecords.metaData;
@@ -135,13 +180,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 					if(nature == 'init'){
 						$scope.columns = $scope.getColumns(datasetRecords.metaData.fields);
 						$scope.gridOptions.api.setColumnDefs($scope.columns);
-						$scope.gridOptions.api.resetRowHeights();
+						$scope.gridOptions.api.resetRowHeights();	
 					}
 					$scope.gridOptions.api.setRowData(datasetRecords.rows);
 					resizeColumns();
 				}
 				$scope.totalResults = datasetRecords.results;
 				$scope.hideWidgetSpinner();
+			}
+			$scope.hideWidgetSpinner();
+			if(nature == 'init'){
+				$timeout(function(){
+					$scope.widgetIsInit=true;
+					cockpitModule_properties.INITIALIZED_WIDGETS.push($scope.ngModel.id);
+				},500);
 			}
 		}
 		
@@ -156,6 +208,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 				for(var f in fields){
 					if(typeof fields[f] == 'object' && $scope.ngModel.content.columnSelectedOfDataset[c].name === fields[f].header){
 						var tempCol = {"headerName":$scope.ngModel.content.columnSelectedOfDataset[c].alias,"field":fields[f].name, "tooltipField":fields[f].name};
+						tempCol.paramType = fields[f].type;
+						if(fields[f].type == 'text') {
+							tempCol.cellRenderer = textCellRenderer;
+							tempCol.cellClass = 'textCell';
+						}
 						if(!$scope.ngModel.content.columnSelectedOfDataset[c].visible) tempCol.hide = true;
 						if($scope.ngModel.content.columnSelectedOfDataset[c].style) tempCol.style = $scope.ngModel.content.columnSelectedOfDataset[c].style;
 						tempCol.headerComponentParams = {template: headerTemplate()};
@@ -167,6 +224,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 			}
 			return columns
 		}
+		
+		function textCellRenderer () {}
+		textCellRenderer.prototype.init = function(params) {
+		    this.eGui = document.createElement('div');
+		    this.eGui.innerHTML = params.value;
+		};
+		textCellRenderer.prototype.getGui = function() {
+		    return this.eGui;
+		};
 		
 		function headerTemplate() { 
 			return 	'<div class="ag-cell-label-container" role="presentation" style="background-color:'+$scope.ngModel.style.th["background-color"]+'">'+
@@ -193,50 +259,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 			}
 		}
 		
+	    $scope.deleteSelections = function(item){
+	    	var reloadAss=false;
+	    	var reloadFilt=[];
+
+	    	if(item.aggregated){
+				var key = item.ds + "." + item.columnName;
+
+				for(var i=0; i<cockpitModule_template.configuration.aggregations.length; i++){
+					if(cockpitModule_template.configuration.aggregations[i].datasets.indexOf(item.ds) !=-1){
+						var selection = cockpitModule_template.configuration.aggregations[i].selection;
+						if(selection){
+							delete selection[key];
+							reloadAss=true;
+						}
+					}
+				}
+			}else{
+				if(cockpitModule_template.configuration.filters){
+					if(cockpitModule_template.configuration.filters[item.ds]){
+						delete cockpitModule_template.configuration.filters[item.ds][item.columnName];
+
+						if(Object.keys(cockpitModule_template.configuration.filters[item.ds]).length==0){
+							delete cockpitModule_template.configuration.filters[item.ds];
+						}
+
+						reloadFilt.push(item.ds);
+					}
+				}
+			}
+
+			if(reloadAss){
+				cockpitModule_widgetSelection.getAssociations(true);
+			}
+
+			if(!reloadAss && reloadFilt.length!=0){
+				$scope.cockpitModule_widgetSelection.refreshAllWidgetWhithSameDataset(reloadFilt);
+			}
+
+			var hs=false;
+			for(var i=0; i<cockpitModule_template.configuration.aggregations.length; i++){
+				if(Object.keys(cockpitModule_template.configuration.aggregations[i].selection).length>0){
+					hs= true;
+					break;
+				}
+			}
+
+			if(hs==false && Object.keys(cockpitModule_template.configuration.filters).length==0){
+				cockpitModule_properties.HAVE_SELECTIONS_OR_FILTERS=false;
+			}
+	    }
+		
 		$scope.deleteFilterSelection = function(group, value){
 			var item = {};
-			item.aggregated=false;
+			item.aggregated= cockpitModule_template.configuration.aggregations ? true : false;
 			item.columnName=group;
 			item.columnAlias=group;
 			item.value = value;
 			item.ds=$scope.ngModel.dataset.label;
-			delete cockpitModule_template.configuration.filters[$scope.ngModel.dataset.label][group];
+			if(cockpitModule_template.configuration.filters[$scope.ngModel.dataset.label]) delete cockpitModule_template.configuration.filters[$scope.ngModel.dataset.label][group];
+			if(cockpitModule_template.configuration.aggregations[0].selection[$scope.ngModel.dataset.label+'.'+group]) delete cockpitModule_template.configuration.aggregations[0].selection[$scope.ngModel.dataset.label+'.'+group];
+			if(cockpitModule_template.configuration.filters[$scope.ngModel.dataset.label] && Object.keys(cockpitModule_template.configuration.filters[$scope.ngModel.dataset.label]).length==0){
+				delete cockpitModule_template.configuration.filters[$scope.ngModel.dataset.label];
+			}
+			if(Object.keys(cockpitModule_template.configuration.filters).length==0) cockpitModule_properties.HAVE_SELECTIONS_OR_FILTERS=false;
+			if(Object.keys(cockpitModule_template.configuration.aggregations[0].selection).length==0) cockpitModule_properties.HAVE_SELECTIONS_OR_FILTERS=false;
 			$rootScope.$broadcast('DELETE_SELECTION',item);
+			$scope.deleteSelections(item);
+			//$scope.refreshWidget();
 		}
 		
 		$scope.selectItem = function(group, item){
+			if(item.column_2==0) return;
 			if($scope.dimensions && $scope.dimensions.width<600){
 				$scope.toggleMenu();
 			}
-//			if($scope.ngModel.settings.facets.selection){
-				if(cockpitModule_template.configuration.filters[$scope.ngModel.dataset.label] && cockpitModule_template.configuration.filters[$scope.ngModel.dataset.label][group]==item.column_1){
+			if($scope.ngModel.settings.facets.selection){
+				$scope.ngModel.search.facets = {};
+				if(cockpitModule_template.configuration.filters[$scope.ngModel.dataset.label] && cockpitModule_template.configuration.filters[$scope.ngModel.dataset.label][group]==item.column_1
+						|| $scope.template.configuration.aggregations && $scope.template.configuration.aggregations[0].selection && $scope.template.configuration.aggregations[0].selection[$scope.ngModel.dataset.label+'.'+group] == item.column_1){
 					$scope.deleteFilterSelection(group, item.column_1);
 				}else{
 					$scope.doSelection(group, item.column_1, null, null, item, null, undefined, !$scope.ngModel.settings.facets.selection);
 				}
-//			}else{
-//				$scope.showWidgetSpinner();
-//				var tempFilter = {
-//					"colAlias":group,
-//					"colName":group,
-//					"dataset":$scope.ngModel.dataset.label,
-//					filterOperator : "=",
-//					filterVals : [item.column_1],
-//					type:"java.lang.String"
-//				};
-//				if($scope.ngModel.filters && $scope.ngModel.filters.length>0){
-//					for(var k in $scope.ngModel.filters){
-//						if($scope.ngModel.filters[k].colName == group && $scope.ngModel.filters[k].filterVals.indexOf(item.column_1)!=-1) {
-//							$scope.ngModel.filters.splice(k,1);
-//						}else {
-//							$scope.ngModel.filters.push(tempFilter);
-//						}
-//					}
-//				}else {
-//					$scope.ngModel.filters = [tempFilter];
-//				}
-//				$scope.refreshWidget();
-//			}
+			}else{
+				if(!$scope.ngModel.search.facets) $scope.ngModel.search.facets = {};
+				if($scope.ngModel.search.facets[group] && $scope.ngModel.search.facets[group].filterVals.length>0){
+					for(var k in $scope.ngModel.search.facets[group].filterVals){
+						if($scope.ngModel.search.facets[group].filterVals.indexOf(item.column_1)!=-1) {
+							$scope.ngModel.search.facets[group].filterVals.splice(k,1);
+							if($scope.ngModel.search.facets[group].filterVals.length==0) delete $scope.ngModel.search.facets[group];
+						}else {
+							$scope.ngModel.search.facets[group].filterVals.push(item.column_1);
+						}
+					}
+				}else {
+					$scope.ngModel.search.facets[group] = { filterOperator: "=", filterVals: [item.column_1]} ;
+				}
+				$scope.refreshWidget();
+			}
 		}
 		
 		$scope.first = function(){
@@ -272,6 +393,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 			for(var k in $scope.ngModel.content.columnSelectedOfDataset){
 				if($scope.ngModel.content.columnSelectedOfDataset[k].name == facet && $scope.ngModel.content.columnSelectedOfDataset[k].facet) return true
 			}
+			return false;
+		}
+		
+		$scope.isFacetSelected = function(group,item){
+			if($scope.template.configuration.filters && $scope.template.configuration.filters[$scope.ngModel.dataset.label] && $scope.template.configuration.filters[$scope.ngModel.dataset.label][group] == item.column_1) return true;
+			if($scope.ngModel.search.facets && $scope.ngModel.search.facets[group] && $scope.ngModel.search.facets[group].filterVals.indexOf(item.column_1)!=-1) return true;
+			if($scope.template.configuration.aggregations){
+			    for(var i in $scope.template.configuration.aggregations){
+			        if($scope.template.configuration.aggregations[i].selection && $scope.template.configuration.aggregations[i].selection[$scope.ngModel.dataset.label+'.'+group] == item.column_1)
+			            return true;
+			    }
+            }
 			return false;
 		}
 

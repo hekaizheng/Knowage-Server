@@ -90,21 +90,37 @@ angular.module('cockpitModule').directive('cockpitStyleCustomWidgetConfigurator'
 function cockpitStyleConfiguratorControllerFunction($scope,sbiModule_translate,cockpitModule_template,cockpitModule_generalOptions){
 	$scope.translate=sbiModule_translate;
 	$scope.cockpitModule_generalOptions=cockpitModule_generalOptions;
+	$scope.cockpitModule_template = cockpitModule_template;
 	$scope.angular=angular;
+	
 	$scope.cockpitStyle={};
 	angular.copy(cockpitModule_template.configuration.style,$scope.cockpitStyle);
 
 	$scope.initModel=function(){
-		angular.copy(angular.merge({},$scope.cockpitStyle,$scope.ngModel),$scope.ngModel)
+		angular.copy(angular.merge({},$scope.cockpitStyle,$scope.ngModel),$scope.ngModel);
 	}
-
 
 	$scope.resetBordersStyle=function(){
-		$scope.ngModel.borders=$scope.cockpitStyle.borders
+		$scope.ngModel.borders = $scope.cockpitStyle.borders;
 		angular.copy($scope.cockpitStyle.border,$scope.ngModel.border);
 	}
+	
+	if($scope.ngModel && !$scope.ngModel.padding) $scope.ngModel.padding = {};
+	$scope.resetPaddingStyle=function(){
+		$scope.ngModel.padding = $scope.cockpitStyle.padding;
+		angular.copy($scope.cockpitStyle.padding,$scope.ngModel.padding);
+	}
+	
+	$scope.linkPaddings = function(link){
+		$scope.ngModel.padding.unlinked = link;
+	}
+	
+	$scope.checkPaddingLink = function(padding){
+		if(!$scope.ngModel.padding.unlinked) $scope.ngModel.padding['padding-left'] = $scope.ngModel.padding['padding-top'] = $scope.ngModel.padding['padding-right'] = $scope.ngModel.padding['padding-bottom'] = $scope.ngModel.padding[padding];
+	}
+	
 	$scope.resetTitlesStyle=function(){
-		$scope.ngModel.titles=$scope.cockpitStyle.titles;
+		$scope.ngModel.titles = $scope.cockpitStyle.titles;
 		$scope.ngModel.headerHeight=0;
 		angular.copy($scope.cockpitStyle.title,$scope.ngModel.title);
 	}
@@ -132,12 +148,24 @@ function cockpitStyleConfiguratorControllerFunction($scope,sbiModule_translate,c
 
 	$scope.borderColorOptions={format:'rgb',disabled:false};
 	
-	$scope.$watch('ngModel.borders',function(newValue,oldValue){
+	$scope.isUndefined = function(property){
+		return typeof(property)=='undefined' ? true : false;
+	}
+	
+	$scope.screenAvailable=function(){
+		if($scope.$parent.model && ($scope.$parent.model.type == 'selection' || $scope.$parent.model.type == 'selector')) return false;
+		if($scope.$parent.localModel && ($scope.$parent.localModel.type == 'selection' || $scope.$parent.localModel.type == 'selector')) return false;
+		return true;
+	}
+	
+	$scope.changeShowScreenshot = function(){
+		$scope.ngModel.showScreenshot = !cockpitModule_template.configuration.showScreenshot;
+	}
+	
+	$scope.bordersWatcher = $scope.$watch('ngModel.borders',function(newValue,oldValue){
 		$scope.borderColorOptions.disabled = !newValue;
 	})
 	
-	
-
 	$scope.toggleBorderVisibility=function(){
 		$scope.borderColorOptions.disabled=!$scope.ngModel.borders
 	}
@@ -158,24 +186,6 @@ function cockpitStyleConfiguratorControllerFunction($scope,sbiModule_translate,c
 		                    	exampleClass:"borderExampleDotted"
 		                    }
 	                    ];
-	$scope.bordersWidth=[
-		                    {
-		                    	label:sbiModule_translate.load("sbi.cockpit.style.small"),
-		                    	value:"0.1em"
-		                    },
-		                    {
-		                    	label:sbiModule_translate.load("sbi.cockpit.style.medium"),
-		                    	value:"0.3em"
-		                    },
-		                    {
-		                    	label:sbiModule_translate.load("sbi.cockpit.style.large"),
-		                    	value:"0.7em"
-		                    },
-		                    {
-		                    	label:sbiModule_translate.load("sbi.cockpit.style.extralarge"),
-		                    	value:"1em"
-		                    },
-	                    ];
 
 	$scope.boxShadow=[
 		                    {
@@ -195,8 +205,14 @@ function cockpitStyleConfiguratorControllerFunction($scope,sbiModule_translate,c
 		                    	value:'0px 8px 19px #ccc'
 		                    },
 	                    ];
+	
+	$scope.$on('$destroy', function() {
+		$scope.bordersWatcher();
+  });
 
 }
+
+
 
 
 })();

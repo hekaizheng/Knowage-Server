@@ -3,10 +3,20 @@ kn-table {
 	display: block;
 	.kn-table-container {
 		height: 100%;
+		overflow-y: auto;
 		margin: 8px;
 		background-color: $tabBackground;
+		&.kn-background-transparent {
+			background-color: transparent;
+		}
+		&.kn-height-auto {
+			height: auto;
+		}
 		&.kn-table-full-width {
 			margin: 0;
+		}
+		&.kn-table-full-height {
+			height: 100%;
 		}
 		&.kn-table-shadowed {
 			box-shadow: 0px 3px 3px $shadowsColor;
@@ -27,6 +37,7 @@ kn-table {
 					border-bottom: 1px solid $ternaryColor;
 					text-align: left;
 					md-icon{
+						display: inline-block !important;
 						color: $baseColor;
 						transition: transform .3s ease-in;
 						&.rotate180{
@@ -204,3 +215,18 @@ kn-table {
 			overflow: auto;
 		}
 	}	
+
+@-moz-document url-prefix() {
+	.kn-firefox-height-fix:not(.kn-table) {
+		height: calc(100vh - 105px);
+	}
+}
+
+@media all and (-ms-high-contrast: none), (-ms-high-contrast: active) {
+	.kn-table-container {
+		&.kn-table-full-height {
+			height: 100%;
+			width: auto;
+		}
+	}
+}

@@ -15,7 +15,6 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
 /**
  * @authors Giovanni Luca Ulivo (GiovanniLuca.Ulivo@eng.it) v0.0.1
  *
@@ -26,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 	currentScriptPath = currentScriptPath.substring(0, currentScriptPath.lastIndexOf('/') + 1);
 
 angular.module('cockpitModule')
-.config( ['$compileProvider', function( $compileProvider ){   
+.config( ['$compileProvider', function( $compileProvider ){
         	$compileProvider.aHrefSanitizationWhitelist(/^\s*(https?|ftp|mailto|chrome-extension|data):/);
     	}
 ])
@@ -135,7 +134,7 @@ angular.module('cockpitModule')
 		return sbiModule_i18n.getI18n(label);
 	}
 })
-.directive('cockpitWidget',function(cockpitModule_widgetConfigurator,cockpitModule_widgetServices,$compile,cockpitModule_widgetSelection,$rootScope,cockpitModule_datasetServices, cockpitModule_properties){
+.directive('cockpitWidget',function(cockpitModule_widgetConfigurator,cockpitModule_widgetServices,$compile,cockpitModule_widgetSelection,$rootScope,cockpitModule_datasetServices, cockpitModule_properties, cockpitModule_exportWidgetService, $httpParamSerializer){
 	   return{
 		   templateUrl: baseScriptPath+ '/directives/cockpit-widget/templates/cockpitWidget.html',
 		   controller: cockpitWidgetControllerFunction,
@@ -162,11 +161,17 @@ angular.module('cockpitModule')
 	                    			if(scope.ngModel.cliccable){
 	                    				scope.ngModel.drillable = false;
 	                    			} else {
-	                    				if($scope.enterpriseEdition)
+	                    				if(scope.enterpriseEdition)
 	                    				scope.ngModel.drillable = true;
 	                    			}
 
 	                    		}
+
+	                    		scope.showNegativer = true;
+	                    		if(!scope.ngModel.cliccable && !scope.ngModel.drillable && !scope.cockpitModule_properties.EDIT_MODE){
+	                    			scope.showNegativer = false;
+	                    		}
+
 	                    		if(scope.ngModel.type == "selector"){
 	                    			scope.updateble = true;
 	                    		}else{
@@ -247,14 +252,24 @@ function cockpitWidgetControllerFunction(
 		sbiModule_config,
 		$filter,
 		$sce,
-		$mdDialog)
+		$mdDialog,cockpitModule_backwardCompatibility,
+		cockpitModule_exportWidgetService,
+		$httpParamSerializer)
+
 	{
+
+	var SERVICE = "/restful-services/2.0/datasets/preview";
+
+	$scope.cockpitModule_properties = cockpitModule_properties;
 
 	$scope.openMenu = function($mdMenu, ev) {
 	      $mdMenu.open(ev);
 	    };
-	    
-	$scope.cockpitModule_properties=cockpitModule_properties;
+
+	if(!cockpitModule_backwardCompatibility.compareVersion(cockpitModule_properties.CURRENT_KNOWAGE_VERSION,$scope.ngModel.knowageVersion)){
+		$scope.ngModel = cockpitModule_backwardCompatibility.updateModel($scope.ngModel);
+	}
+
 	$scope.cockpitModule_template=cockpitModule_template;
 	$scope.translate		= sbiModule_translate;
 	$scope.i18n		= sbiModule_i18n;
@@ -263,7 +278,10 @@ function cockpitWidgetControllerFunction(
 	$scope.editingWidgetName= false;
 	$scope.extendedStyle	= {};
 
+	$scope.isOriginal = false;//for previewing different types of chart
+
 	$scope.borderShadowStyle= {};
+	$scope.paddingStyle		= {};
 	$scope.titleStyle		= {};
 
 	$scope.widgetSpinner	= false;
@@ -314,7 +332,12 @@ function cockpitWidgetControllerFunction(
 		$scope.refreshWidget();
 	}
 
-
+	$scope.showScreenshotButton = function(){
+		if($scope.ngModel.type =='selector' || $scope.ngModel.type =='selection' || $scope.ngModel.type =='document') return false;
+		if(typeof($scope.ngModel.style.showScreenshot) == 'undefined' ) {
+			return cockpitModule_template.configuration.showScreenshot;
+		}else return $scope.ngModel.style.showScreenshot;
+	}
 
 	// global WIDGET_EVENT
 	$rootScope.$on('WIDGET_EVENT',function(conf,eventType,config){
@@ -326,7 +349,6 @@ function cockpitWidgetControllerFunction(
 			$scope.updateFromDatasetFilter(config.label);
 			break;
 		case "UPDATE_FROM_CLEAN_CACHE":
-
 			$scope.refreshWidget();
 			break;
 		case "UPDATE_FROM_NEAR_REALTIME":
@@ -365,22 +387,33 @@ function cockpitWidgetControllerFunction(
 
 		switch(eventType){
 		case "REFRESH"  :
-			if($scope.refresh==undefined){
-				/*$timeout(function(){
-					$scope.refresh(config.element,config.width,config.height, config.data,config.nature,config.associativeSelection);
-				},1000);*/
-				$scope.refresh(config.element,config.width,config.height, config.data,config.nature,config.associativeSelection);
+		    var dirtyIndex = $scope.cockpitModule_properties.DIRTY_WIDGETS.indexOf($scope.ngModel.id);
+		    if($scope.$parent.$parent.sheet.index == $scope.cockpitModule_properties.CURRENT_SHEET){
+                if(dirtyIndex > -1){
+                    $scope.cockpitModule_properties.DIRTY_WIDGETS.splice(dirtyIndex, 1);
+                }
 
-			}else{
-
-				$scope.refresh(config.element,config.width,config.height,config.data,config.nature,config.associativeSelection,config.changedChartType,config.chartConf,config.options);
-			}
+		        if($scope.refresh==undefined){
+                    $timeout(function(){
+                        $scope.refresh(config.element,config.width,config.height, config.data,config.nature,config.associativeSelection,config.changedChartType,config.chartConf,config.options);
+                    },1000);
+                }else{
+                    $scope.refresh(config.element,config.width,config.height,config.data,config.nature,config.associativeSelection,config.changedChartType,config.chartConf,config.options);
+                }
+		    }else{
+		        if(dirtyIndex == -1){
+                    $scope.cockpitModule_properties.DIRTY_WIDGETS.push($scope.ngModel.id);
+                }
+		    }
 			break;
+		case "UPDATE_FROM_SHEET_CHANGE" :
+			 $scope.refreshWidget(null,$scope.ngModel.type=="document" ? "parameter_change" : null);
+            break;
 		case "INIT" :
 			$scope.scopeInit(config.element,config.width,config.height, config.data,config.nature,config.associativeSelection);
 			break;
 		case "RESIZE" :
-			if($scope.ngModel.type=="chart" || $scope.ngModel.type=="map") {
+			if($scope.ngModel.type=="chart" || $scope.ngModel.type=="map" || $scope.ngModel.type=="static-pivot-table") {
 				$scope.refreshWidget(undefined, 'resize');
 			}
 			break;
@@ -430,17 +463,17 @@ function cockpitWidgetControllerFunction(
 			console.log("widget is not updateble")
 			return;
 		}
-		var document= $scope.getDocument();
+		var document = $scope.getDocument();
 		if(dataset != undefined && cockpitModule_widgetSelection.getCurrentSelections(dataset.label)!=undefined){
-				if(isInit){
-					$scope.initWidget();
-				}else{
-					if(associativeSelection==undefined || associativeSelection.hasOwnProperty(dataset.label)){
-						var option =$scope.getOptions == undefined? {} :  $scope.getOptions();
-						cockpitModule_widgetServices.refreshWidget($scope.subCockpitWidget,$scope.ngModel,'selections',option);
-					}
-				}
-		}
+            if(isInit){
+                $scope.initWidget();
+            }else{
+                if(associativeSelection==undefined || associativeSelection.hasOwnProperty(dataset.label)){
+                    var option =$scope.getOptions == undefined? {} :  $scope.getOptions();
+                    cockpitModule_widgetServices.refreshWidget($scope.subCockpitWidget,$scope.ngModel,'selections',option);
+                }
+            }
+        }
 		if(document != undefined && cockpitModule_widgetSelection.getCurrentSelections(document.DOCUMENT_LABEL)!=undefined){
 			if(isInit){
 				$scope.initWidget();
@@ -457,8 +490,8 @@ function cockpitWidgetControllerFunction(
 
 	$scope.updateFromDatasetFilter=function(label){
 		var dataset= $scope.getDataset(label);
-
-
+		var document = $scope.getDocumentByLabel(label);
+		
 		if($scope.ngModel.updateble==false){
 			if(dataset && $scope.cockpitModule_properties.DS_IN_CACHE.indexOf(dataset.label)==-1){
 				$scope.cockpitModule_properties.DS_IN_CACHE.push(dataset.label);
@@ -466,19 +499,10 @@ function cockpitWidgetControllerFunction(
 			console.log("widget is not updateble")
 			return;
 		}
-		if(dataset != undefined &&
-			(
-				(angular.isArray(label) && label.indexOf(dataset.label)!=-1)
-				||
-				(angular.isString(label) && angular.equals(label,dataset.label))
-			)
-		){
-
+		if((dataset != undefined && label == dataset.label)|| (document != undefined && label == document.DOCUMENT_LABEL)){
 			var options = {};
 			options.label = label;
 			$scope.refreshWidget(options,'filters');
-
-
 		}
 	}
 
@@ -493,7 +517,7 @@ function cockpitWidgetControllerFunction(
 	}
 
 	$scope.clearAllSelectionsAndRefresh=function(){
-		cockpitModule_widgetSelection.clearAllSelections();
+		cockpitModule_widgetSelection.clearAllSelections(); 
 		cockpitModule_widgetSelection.refreshAllWidgetWhithSameDataset($scope.getDataset().label);
 	}
 
@@ -631,6 +655,9 @@ function cockpitWidgetControllerFunction(
 			$scope.ngModel.cliccable = false;
 			$scope.ngModel.drillable = true;
 		} else if(!$scope.ngModel.cliccable && $scope.ngModel.drillable){
+			if(!$scope.cockpitModule_properties.EDIT_MODE){
+				$scope.showNegativer = true;
+			}
 			$scope.ngModel.cliccable = false;
 			$scope.ngModel.drillable = false;
 		}  else {
@@ -639,17 +666,83 @@ function cockpitWidgetControllerFunction(
 		}
 		$scope.$broadcast("drillClick",{ "drillable": $scope.ngModel.drillable, "cliccable": $scope.ngModel.cliccable});
 	}
+
+	$scope.checkPreviewParameters = function(previewSettings, previewDataset, columnName, modalColumn, row, clickedValue){
+		if (modalColumn == undefined || modalColumn == "") {
+			var parameters = cockpitModule_datasetServices.getDatasetParameters(previewDataset.id.dsId);
+			var parametersString = cockpitModule_datasetServices.getParametersAsString(parameters);
+			modalColumn = angular.fromJson(parametersString);
+		}
+		for(var p in previewSettings.parameters){
+			if(previewSettings.parameters[p].bindType != 'static' && previewSettings.parameters[p].defaultValue) previewSettings.parameters[p].value = previewSettings.parameters[p].defaultValue
+			if(previewSettings.parameters[p].bindType == 'driver'){
+				previewSettings.parameters[p].value = cockpitModule_analyticalDrivers[previewSettings.parameters[p].driver];
+			}
+			if(previewSettings.parameters[p].bindType == 'dynamic'){
+				if($scope.ngModel.type == 'chart') previewSettings.parameters[p].value = clickedValue;
+				else previewSettings.parameters[p].value = row[previewSettings.parameters[p].column];
+			}
+			if(previewSettings.parameters[p].bindType == 'selection'){
+				if(cockpitModule_template.configuration.filters && cockpitModule_template.configuration.filters[previewSettings.parameters[p].dataset]) {
+					previewSettings.parameters[p].value = cockpitModule_template.configuration.filters[previewSettings.parameters[p].dataset][previewSettings.parameters[p].column];
+				}
+			}
+		}
+		return previewSettings.parameters;
+	}
+
 	$scope.doSelection = function(columnName, columnValue, modalColumn, modalValue, row, skipRefresh, dsId, disableAssociativeLogic){
 		if($scope.ngModel.cliccable==false){
 			console.log("widget is not cliccable")
 			return;
 		}
 
-		// check if cross navigation was enable don this widget
+		var dataset = dsId != undefined ? cockpitModule_datasetServices.getDatasetById(dsId) : $scope.getDataset();
+
 		var model = $scope.ngModel;
-		if(model.cross != undefined  && model.cross.cross != undefined
-				&& model.cross.cross.enable === true
-				){
+
+		var previewSettings;
+
+		if($scope.ngModel.cross && $scope.ngModel.cross.preview) previewSettings = angular.copy($scope.ngModel.cross.preview);
+		if($scope.ngModel.content && $scope.ngModel.content.preview) previewSettings = angular.copy($scope.ngModel.content.preview);
+
+		if (previewSettings && previewSettings.enable) {
+			if((previewSettings.previewType != 'singleColumn' || (previewSettings.previewType == 'singleColumn' && previewSettings.column == columnName)) &&
+				(previewSettings.previewType != 'icon' || (previewSettings.previewType == 'icon' && columnName == ""))){
+				$scope.iframeSrcUrl = sbiModule_config.host + sbiModule_config.externalBasePath + SERVICE;
+
+				var previewDataset = cockpitModule_datasetServices.getDatasetById(previewSettings.dataset);
+
+				var config = {
+					datasetLabel: previewDataset.label
+				};
+
+				if (previewDataset.parameters && previewDataset.parameters.length > 0)
+					config.parameters = $scope.checkPreviewParameters(previewSettings,previewDataset, columnName, modalColumn, row,columnValue);
+
+				//showing exporters
+				config.options = {
+						exports: ['CSV', 'XLSX']
+				};
+
+				$scope.iframeSrcUrl += '?' + $httpParamSerializer(config);
+
+					$mdDialog.show({
+						parent: angular.element(document.body),
+						templateUrl: currentScriptPath + '/widget/htmlWidget/templates/htmlWidgetPreviewDialogTemplate.html',
+						controller: function(scope) {
+							scope.previewUrl = $scope.iframeSrcUrl;
+
+							scope.closePreview = function() {
+								$mdDialog.hide();
+							}
+						},
+						clickOutsideToClose: true
+					}).then(function(response){}, function(response){});
+				return;
+			}
+
+		}else if(model.cross != undefined  && model.cross.cross != undefined && model.cross.cross.enable === true){
 
 			// enter cross navigation mode
 			var doCross = false;
@@ -667,7 +760,7 @@ function cockpitWidgetControllerFunction(
 				}
 			}
 
-			if(model.cross.cross.allRow == true){
+			if(model.cross.cross.crossType == "allRow" || model.cross.cross.crossType == "icon"){
 				// case all columns are enabled for cross, get value for cross
 				// column (or alias if present)
 				var crossColumnOrAlias = model.cross.cross.column;
@@ -678,7 +771,8 @@ function cockpitWidgetControllerFunction(
 						crossColumnOrAlias = col.aliasToShow;
 					}
 				}
-				doCross = true;
+				if(model.cross.cross.crossType == "icon" && columnValue && model.cross.cross.column) doCross = false;
+				else doCross = true;
 				// get value to pass to cross navigation
 				if(row){
 					if(row[crossColumnOrAlias]){
@@ -727,12 +821,6 @@ function cockpitWidgetControllerFunction(
 
 					if(content.enabled == true){
 
-						/*if(content.dataType == 'date' && content.value != undefined && content.value != ''){
-
-							content.value = content.value.toLocaleDateString('en-US');
-							content.value+= "#MM/dd/yyyy";
-						}*/
-
 						if(content.type == 'static'){
 							var objToAdd = {};
 							objToAdd[par] = content.value;
@@ -765,47 +853,6 @@ function cockpitWidgetControllerFunction(
 					}
 				}
 
-
-
-
-
-				// parse static parameters if present
-				/*var staticParameters = [];
-				if(model.cross.cross.staticParameters && model.cross.cross.staticParameters != ""){
-					var err=false;
-					try{
-						var parsedStaticPars = model.cross.cross.staticParameters.split("&");
-						for(var i=0;i<parsedStaticPars.length;i++){
-							var splittedPar=parsedStaticPars[i].split("=");
-							if(splittedPar[0]==undefined || splittedPar[1]==undefined){err=true;}
-							else{
-								var toInsert = {};
-								toInsert[splittedPar[0]] = splittedPar[1];
-								staticParameters.push(toInsert);
-							}
-
-						}
-
-					}catch(e){
-						err=true
-						console.error(e);
-					}finally{
-						if(err){
-							 $mdDialog.show(
-								      $mdDialog.alert()
-								        .clickOutsideToClose(true)
-								        .title(sbiModule_translate.load("sbi.cockpit.cross.staticParameterErrorFormatTitle"))
-								        .content(sbiModule_translate.load("sbi.cockpit.cross.staticParameterErrorFormatMsg"))
-								        //.ariaLabel('Alert Dialog Demo')
-								        .ok(sbiModule_translate.load("sbi.general.continue"))
-								    );
-								return;
-						}
-
-						}
-
-				}*/
-
 				// if destination document is specified don't ask
 				if(model.cross.cross.crossName != undefined){
 					parent.execExternalCrossNavigation(outputParameter,{},model.cross.cross.crossName,null,otherOutputParameters);
@@ -816,8 +863,6 @@ function cockpitWidgetControllerFunction(
 				return;
 			}
 		}
-
-		var dataset = dsId != undefined ? cockpitModule_datasetServices.getDatasetById(dsId) : $scope.getDataset();
 
 		if(dataset && columnName){
 
@@ -855,7 +900,8 @@ function cockpitWidgetControllerFunction(
 					//check on pivot table structure: rows and columns definition
 					if (originalColumnName == undefined || originalColumnName == ""){
 						for(var i=0; i<$scope.ngModel.content.crosstabDefinition.columns.length; i++){
-							if($scope.ngModel.content.crosstabDefinition.columns[i].alias && $scope.ngModel.content.crosstabDefinition.columns[i].alias.toUpperCase() === columnName.toUpperCase()){
+							if(($scope.ngModel.content.crosstabDefinition.columns[i].alias && $scope.ngModel.content.crosstabDefinition.columns[i].alias.toUpperCase() === columnName.toUpperCase()) ||
+									$scope.ngModel.content.crosstabDefinition.columns[i].id.toUpperCase() === columnName.toUpperCase()){
 									originalColumnName = $scope.ngModel.content.crosstabDefinition.columns[i].id;
 								break;
 							}
@@ -863,7 +909,8 @@ function cockpitWidgetControllerFunction(
 					}
 					if (originalColumnName == undefined || originalColumnName == ""){
 						for(var i=0; i<$scope.ngModel.content.crosstabDefinition.rows.length; i++){
-							if($scope.ngModel.content.crosstabDefinition.rows[i].alias && $scope.ngModel.content.crosstabDefinition.rows[i].alias.toUpperCase() === columnName.toUpperCase()){
+							if(($scope.ngModel.content.crosstabDefinition.rows[i].alias && $scope.ngModel.content.crosstabDefinition.rows[i].alias.toUpperCase() === columnName.toUpperCase()) ||
+									$scope.ngModel.content.crosstabDefinition.rows[i].id.toUpperCase() === columnName.toUpperCase()){
 								originalColumnName = $scope.ngModel.content.crosstabDefinition.rows[i].id;
 								break;
 							}
@@ -886,7 +933,8 @@ function cockpitWidgetControllerFunction(
 						var foundInColumns = false;
 						var foundInRows = false;
 						for(var i=0; i<$scope.ngModel.content.crosstabDefinition.columns.length; i++){
-							if($scope.ngModel.content.crosstabDefinition.columns[i].alias && $scope.ngModel.content.crosstabDefinition.columns[i].alias.toUpperCase() === singleColumnName.toUpperCase()){
+							if(($scope.ngModel.content.crosstabDefinition.columns[i].alias && $scope.ngModel.content.crosstabDefinition.columns[i].alias.toUpperCase() === singleColumnName.toUpperCase()) ||
+									$scope.ngModel.content.crosstabDefinition.columns[i].id.toUpperCase() === singleColumnName.toUpperCase()){
 								originalColumnName.push($scope.ngModel.content.crosstabDefinition.columns[i].id);
 								foundInColumns = true;
 								break;
@@ -894,7 +942,8 @@ function cockpitWidgetControllerFunction(
 						}
 						if (!foundInColumns){
 							for(var i=0; i<$scope.ngModel.content.crosstabDefinition.rows.length; i++){
-								if($scope.ngModel.content.crosstabDefinition.rows[i].alias && $scope.ngModel.content.crosstabDefinition.rows[i].alias.toUpperCase() === singleColumnName.toUpperCase()){
+								if(($scope.ngModel.content.crosstabDefinition.rows[i].alias && $scope.ngModel.content.crosstabDefinition.rows[i].alias.toUpperCase() === singleColumnName.toUpperCase()) ||
+										$scope.ngModel.content.crosstabDefinition.rows[i].id.toUpperCase() === singleColumnName.toUpperCase()){
 									originalColumnName.push($scope.ngModel.content.crosstabDefinition.rows[i].id);
 									foundInRows = true;
 									break;
@@ -909,10 +958,10 @@ function cockpitWidgetControllerFunction(
 					}
 				}
 			}
-
+		    cockpitModule_widgetSelection.addTimestampedSelection(dsLabel, columnName, columnValue, $scope.ngModel.id);
 			var sel = disableAssociativeLogic ? "noAssoc" : cockpitModule_widgetSelection.getAssociativeSelections(columnValue,columnName,dsLabel,originalColumnName);
 			if(sel!=undefined){
-			    cockpitModule_widgetSelection.addTimestampedSelection(dsLabel, columnName, columnValue, $scope.ngModel.id);
+		
 
 				if(!cockpitModule_template.configuration.aliases){
 					cockpitModule_template.configuration.aliases = [];
@@ -1040,6 +1089,12 @@ function cockpitWidgetControllerFunction(
 				delete $scope.borderShadowStyle['border-style'];
 			}
 		}
+		
+		if($scope.extendedStyle.padding && $scope.extendedStyle.padding.enabled){
+			$scope.paddingStyle = angular.copy($scope.extendedStyle.padding);
+		}else {
+			$scope.paddingStyle = {};
+		}
 
 		// update shadow style
 		if($scope.extendedStyle.shadows!=undefined){
@@ -1131,7 +1186,14 @@ function cockpitWidgetControllerFunction(
 			return undefined;
 		}
 	}
-
+	
+	$scope.getDocumentByLabel = function(label){
+		if($scope.ngModel.document!=undefined && label != undefined){
+			return cockpitModule_documentServices.getDocumentByLabel( label);
+		} else{
+			return undefined;
+		}
+	}
 
 	$scope.expandWidget=function(){
 
@@ -1327,20 +1389,37 @@ function cockpitWidgetControllerFunction(
 			}
 		}
 
+		if(!tempOriginalChartType){
+			var tempOriginalChartType = $scope.ngModel.content.chartTemplateOriginal.CHART.type.toLowerCase();
+		}
+
 		$mdDialog.show({
 			controller: function ($scope,$mdDialog,ngModel) {
 				$scope.widgetName = widgetName;
 
-				$scope.changeChartType = function(type){
+				$scope.changeChartType = function(type, isOriginal){
+
 					var chartType = $scope.ngModel.content.chartTemplate.CHART.type.toLowerCase();
-					var categories = cockpitModule_widgetServices.checkCategories($scope.ngModel.content.chartTemplate);
-					delete $scope.ngModel.content.chartTemplate.CHART.VALUES.CATEGORY;
-					var maxcateg = minMaxCategoriesSeries.categ.max[type] ? minMaxCategoriesSeries.categ.max[type] : undefined;
-					$scope.ngModel.content.chartTemplate.CHART.VALUES.CATEGORY = cockpitModule_widgetServices.compatibleCategories(type, categories, maxcateg);
-					if(minMaxCategoriesSeries.serie.max[type]) $scope.ngModel.content.chartTemplate.CHART.VALUES.SERIE.length = minMaxCategoriesSeries.serie.max[type];
-					$scope.ngModel.content.chartTemplate.CHART.type = type.toUpperCase();
-					$scope.$broadcast("changeChart",{ "type": type});
+
+					if(tempOriginalChartType == type){
+
+						$scope.isOriginal = true;
+						$scope.ngModel.content.chartTemplate.CHART = angular.copy($scope.ngModel.content.chartTemplateOriginal.CHART);
+
+					}else {
+
+						$scope.isOriginal = false;
+						var categories = cockpitModule_widgetServices.checkCategories($scope.ngModel.content.chartTemplate);
+						delete $scope.ngModel.content.chartTemplate.CHART.VALUES.CATEGORY;
+						var maxcateg = minMaxCategoriesSeries.categ.max[type] ? minMaxCategoriesSeries.categ.max[type] : undefined;
+						$scope.ngModel.content.chartTemplate.CHART.VALUES.CATEGORY = cockpitModule_widgetServices.compatibleCategories(type, categories, maxcateg);
+						if(minMaxCategoriesSeries.serie.max[type]) $scope.ngModel.content.chartTemplate.CHART.VALUES.SERIE.length = minMaxCategoriesSeries.serie.max[type];
+						$scope.ngModel.content.chartTemplate.CHART.type = type.toUpperCase();
+
+					}
+					$scope.$broadcast("changeChart",{ "type": type, "isOriginal":$scope.isOriginal});
 					$mdDialog.hide();
+
 				}
 				$scope.cancel = function(){
 					$mdDialog.cancel();
@@ -1354,22 +1433,46 @@ function cockpitWidgetControllerFunction(
 	      locals: {ngModel:$scope.ngModel}
 	    })
 	}
-	
+
 	$scope.captureScreenShot = function(ev,model){
 		model.loadingScreen = true;
-		var element = document.querySelector('#w'+model.id);
-		html2canvas(element,{
-			width: element.scrollWidth,
-		    height: element.scrollHeight
-		    }
-		).then(function(canvas) {
-		    canvas.toBlob(function(blob) {
-		        saveAs(blob, (model.content.name || 'screenshot' )+'.png');
-		    });
-		    delete model.loadingScreen;
-		});
+		var element = document.querySelector('#w'+model.id+' .placedWidget');
+		if(model.type == 'chart' && isIE && $scope.enterpriseEdition){
+			var xml = new XMLSerializer().serializeToString(angular.element(element).find('svg')[0]);
+			xml = xml.replace(/xmlns=\"http:\/\/www\.w3\.org\/2000\/svg\"/, '');
+			canvg(document.getElementById('canvas_'+model.id), xml, {renderCallback:function(){
+				document.getElementById('canvas_'+model.id).toBlob(function(blob) {
+			        saveAs(blob, (model.content.name || 'screenshot' )+'.png');
+			        var tempCtx = document.getElementById('canvas_'+model.id).getContext("2d");
+			        tempCtx.clearRect(0, 0, 0, 0);
+			    });
+			}});
+
+
+		}else{
+			html2canvas(element,{
+				imageTimeout: 0,
+				ignoreElements: document.querySelector('#viewModeMenu'),
+				async: false,
+				width: element.scrollWidth,
+			    height: element.scrollHeight
+			    }
+			).then(function(canvas) {
+			    canvas.toBlob(function(blob) {
+			        saveAs(blob, (model.content.name || 'screenshot' )+'.png');
+			    });
+			});
+		}
+		delete model.loadingScreen;
+
+
+
 	};
-	
+
+	$scope.exportToExcel = function(event, ngModel) {
+		cockpitModule_exportWidgetService.exportWidgetToExcel('xlsx', ngModel);
+	}
+
 };
 
 })();

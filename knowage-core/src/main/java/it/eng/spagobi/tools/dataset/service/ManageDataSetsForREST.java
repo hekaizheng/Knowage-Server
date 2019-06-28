@@ -31,6 +31,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -40,6 +41,7 @@ import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.json.JSONObjectDeserializator;
 
 import it.eng.qbe.dataset.FederatedDataSet;
 import it.eng.qbe.dataset.QbeDataSet;
@@ -117,6 +119,7 @@ public class ManageDataSetsForREST {
 	public static final String DEFAULT_VALUE_PARAM = "defaultValue";
 	public static final String JOB_GROUP = "PersistDatasetExecutions";
 	public static final String SERVICE_NAME = "ManageDatasets";
+	public static final String DRIVERS = "DRIVERS";
 	// logger component
 	public static Logger logger = Logger.getLogger(ManageDataSetsForREST.class);
 	public static Logger auditlogger = Logger.getLogger("dataset.audit");
@@ -704,18 +707,24 @@ public class ManageDataSetsForREST {
 			String qbeDatamarts = json.optString(DataSetConstants.QBE_DATAMARTS);
 			String dataSourceLabel = json.optString(DataSetConstants.QBE_DATA_SOURCE);
 			String jsonQuery = json.optString(DataSetConstants.QBE_JSON_QUERY);
-			HashMap<String, Object> driversMap = new HashMap<>();
+			HashMap<String, Object> driversMap = null;
+			JSONObject driversJSON = json.optJSONObject(DRIVERS);
+			driversMap = JSONObjectDeserializator.getHashMapFromJSONObject(driversJSON);
 
-			JSONObject driversJ = (JSONObject) json.get("parametersString");
-			for (int i = 0; i < JSONObject.getNames(driversJ).length; i++) {
-				if (driversJ.getString(JSONObject.getNames(driversJ)[i]) != "" && (i & 1) == 0)
-					driversMap.put(JSONObject.getNames(driversJ)[i], driversJ.getString(JSONObject.getNames(driversJ)[i]));
-			}
 			jsonDsConfig.put(DataSetConstants.QBE_DATAMARTS, qbeDatamarts);
 			jsonDsConfig.put(DataSetConstants.QBE_DATA_SOURCE, dataSourceLabel);
 			jsonDsConfig.put(DataSetConstants.QBE_JSON_QUERY, jsonQuery);
-			if (driversMap.size() > 0)
-				dataSet.setDrivers(driversMap);
+
+			if (driversMap != null && driversMap.size() > 0) {
+				Set<String> driverUrlNames = driversMap.keySet();
+				for (String driverName : driverUrlNames) {
+					Map mapOfValues = (Map) driversMap.get(driverName);
+					if (mapOfValues.containsKey("value")) {
+						logger.debug("Setting drivers");
+						dataSet.setDrivers(driversMap);
+					}
+				}
+			}
 			// START -> This code should work instead of CheckQbeDataSets around
 			// the projects
 			SpagoBICoreDatamartRetriever retriever = new SpagoBICoreDatamartRetriever();
@@ -788,16 +797,6 @@ public class ManageDataSetsForREST {
 	/**
 	 * @return
 	 */
-//	private BusinessModelDriverRuntime parseJsonObjectToDriver(JSONObject driver) {
-//		BusinessModelDriverRuntime bmDriver = new BusinessModelDriverRuntime();
-//		JSONArray admissibleValues = (JSONArray) driver.get("admissibleValues");
-//
-//			for(int i = 0; i < admissibleValues.length(); i++) {
-//
-//			}
-//		bmDriver.setAdmissibleValues(driver.get("admissibleValues"));
-//		return bmDriver;
-//	}
 
 	public List getCategories(UserProfile userProfile) {
 		IRoleDAO rolesDao = null;
@@ -933,7 +932,7 @@ public class ManageDataSetsForREST {
 
 		try {
 			parametersMap = new HashMap<>();
-
+			String dsType = json.getString(DataSetConstants.DS_TYPE_CD);
 			JSONArray parsListJSON = json.optJSONArray(DataSetConstants.PARS);
 			if (parsListJSON == null) {
 				return parametersMap;
@@ -968,9 +967,9 @@ public class ManageDataSetsForREST {
 
 				String value = "";
 				if (multivalue) {
-					value = getMultiValue(tempVal, type);
+					value = getMultiValue(tempVal, type, dsType);
 				} else {
-					value = getSingleValue(tempVal, type);
+					value = getSingleValue(tempVal, type, dsType);
 				}
 
 				logger.debug("name: " + name + " / value: " + value);
@@ -1247,15 +1246,16 @@ public class ManageDataSetsForREST {
 	 * @param type
 	 * @return
 	 */
-	static String getSingleValue(String value, String type) {
+	static String getSingleValue(String value, String type, String dsType) {
 		String toReturn = "";
-		value = value.trim();
 		if (type.equalsIgnoreCase(DataSetUtilities.STRING_TYPE)) {
-			if (!(value.startsWith("'") && value.endsWith("'"))) {
+
+			if ((!(value.startsWith("'") && value.endsWith("'"))) && !dsType.equals(DataSetConstants.QBE)) {
 				toReturn = "'" + value + "'";
 			} else {
 				toReturn = value;
 			}
+
 		} else if (type.equalsIgnoreCase(DataSetUtilities.NUMBER_TYPE)) {
 
 			if (value.startsWith("'") && value.endsWith("'") && value.length() >= 2) {
@@ -1279,16 +1279,16 @@ public class ManageDataSetsForREST {
 		return toReturn;
 	}
 
-	private String getMultiValue(String value, String type) {
+	private String getMultiValue(String value, String type, String dsType) {
 		String toReturn = "";
 
 		String[] tempArrayValues = value.split(",");
 		for (int j = 0; j < tempArrayValues.length; j++) {
 			String tempValue = tempArrayValues[j];
 			if (j == 0) {
-				toReturn = getSingleValue(tempValue, type);
+				toReturn = getSingleValue(tempValue, type, dsType);
 			} else {
-				toReturn = toReturn + "," + getSingleValue(tempValue, type);
+				toReturn = toReturn + "," + getSingleValue(tempValue, type, dsType);
 			}
 		}
 
@@ -1559,4 +1559,23 @@ public class ManageDataSetsForREST {
 		}
 		return dataSet;
 	}
+
+	// private Map parseJsonDriversMap(JSONObject drivers) {
+	// HashMap<String, Object> driversMap = new HashMap<>();
+	// try {
+	// for (int i = 0; i < JSONObject.getNames(drivers).length; i++) {
+	// if (drivers.getString(JSONObject.getNames(drivers)[i]) != "" && (i & 1) == 0) {
+	// if (drivers.get(JSONObject.getNames(drivers)[i]) instanceof JSONArray) {
+	// String arrayValue = drivers.getJSONArray(JSONObject.getNames(drivers)[i]).getJSONObject(0).getString("value");
+	// driversMap.put(JSONObject.getNames(drivers)[i], arrayValue);
+	// } else
+	// driversMap.put(JSONObject.getNames(drivers)[i], drivers.getString(JSONObject.getNames(drivers)[i]));
+	// }
+	// }
+	// } catch (JSONException e) {
+	// logger.debug("Unsuccessful parsing of JSONObject to map");
+	// throw new JsonException(e.getLocalizedMessage(), e);
+	// }
+	// return driversMap;
+	// }
 }

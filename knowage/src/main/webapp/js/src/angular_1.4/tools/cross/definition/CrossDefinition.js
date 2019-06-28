@@ -40,6 +40,51 @@ angular.module('crossDefinition', ['angular_table','ng-context-menu','ngMaterial
 				}
 			};
 
+			ctr.showHints = function(obj){
+				var msg = "";
+				var hintTitle = "";
+				if (obj == 'Description'){
+					msg = sbiModule_translate.load("sbi.crossnavigation.description.hint");
+					hintTitle = sbiModule_translate.load("sbi.crossnavigation.description.hintTitle");
+				}else{
+					msg = sbiModule_translate.load("sbi.crossnavigation.breadcrumb.hint");
+					hintTitle = sbiModule_translate.load("sbi.crossnavigation.breadcrumb.hintTitle");
+				}
+
+				$mdDialog.show(
+						  $mdDialog
+						    .alert({
+						    	 locals:{},
+						    	 clickOutsideToClose:true,
+						    	 template:
+						             '<md-dialog aria-label="Hint dialog">' +
+						             '  <md-dialog-content>'+
+						             '		<md-toolbar class="primaryToolbar">'+
+						             '			<div class="md-toolbar-tools">'+
+						             ' 				<h2>'+
+						             '   				<span>'+hintTitle+'</span>'+
+						             ' 				</h2>'+
+						             '			</div>'+
+						             '		</md-toolbar>'+
+						             '    	<p>'+ msg+ '</p>'+
+						             '  </md-dialog-content>' +
+						             '  <md-dialog-actions>' +
+						             '    <md-button ng-click="closeDialog()" class="md-raised">' +
+						             '      Close' +
+						             '    </md-button>' +
+						             '  </md-dialog-actions>' +
+						             '</md-dialog>',
+						             controller: hintDialogController
+						      })
+						);
+
+				function hintDialogController ($scope,$mdDialog) {
+			        $scope.closeDialog = function() {
+			          $mdDialog.hide();
+			        }
+				}
+			}
+
 			ctr.navigationList = {
 				columns : [{"label":s.translate.load("sbi.crossnavigation.lst.name"),"name":"name"}
 						  ,{"label":s.translate.load("sbi.crossnavigation.lst.doc.a"),"name":"fromDoc"}
@@ -86,13 +131,23 @@ angular.module('crossDefinition', ['angular_table','ng-context-menu','ngMaterial
                 	action : function(item, event){ctr.navigationList.removeItem(item, event);}
                 }],
                 removeItem : function(item, event){
-					sbiModule_restServices.promisePost('1.0/crossNavigation/remove', "", "{'id':"+item.id+"}")
-					.then(function(response) {
-						ctr.navigationList.loadNavigationList();
-						$scope.showActionOK("sbi.crossnavigation.remove.ok");
-					},function(response){
-						$scope.showActionOK("sbi.crossnavigation.remove.ko");
-					});
+                	
+                	 var confirm = $mdDialog.confirm()
+	                     .title(sbiModule_translate.load('kn.crossnavigation.delete'))
+	                     .textContent(sbiModule_translate.load('kn.crossnavigation.confirm'))
+	                     .targetEvent(event)
+	                     .ok(sbiModule_translate.load('kn.generic.yes'))
+	                     .cancel(sbiModule_translate.load('kn.generic.cancel'));
+
+	               $mdDialog.show(confirm).then(function() {
+	            	   sbiModule_restServices.promisePost('1.0/crossNavigation/remove', "", "{'id':"+item.id+"}")
+						.then(function(response) {
+							ctr.navigationList.loadNavigationList();
+							$scope.showActionOK("sbi.crossnavigation.remove.ok");
+						},function(response){
+							$scope.showActionOK("sbi.crossnavigation.remove.ko");
+						});
+	               }, function() {});
 				}
 			};
 

@@ -33,15 +33,15 @@ firstUrlTocallvar = firstUrl;
 
 </script>
 <iframe src="<%= firstUrlToCall %>" id="iframeDoc" width="100%" height="100%" frameborder="0"></iframe>
-<!-- Include AngularJS application -->
+
 <script type="text/javascript"	src="<%=urlBuilder.getResourceLink(request, "js/lib/persist-0.1.0/persist.js")%>"></script>
 <script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/menu/menuApp.js")%>"></script>
 
 
 <div data-ng-controller="menuCtrl" ng-app="menuApp" id="menuApp">
 <div id="divContainer" class="overlayButtonBar ">
-	<a href="#" data-ng-click="toggleMenu()" class="menuKnowage"><i class="material-icons md-24">menu</i></a>
-	<a href="#" aria-hidden="true" class="logoKnowage"><img src="<%=urlBuilder.getResourceLinkByTheme(request, "/css/menuBar/logo_knowage.png", currTheme)%>" /></a>
+	<a href="#" data-ng-click="toggleMenu()" class="menuKnowage"><i class="material-icons">menu</i></a>
+	<a href="#" aria-hidden="true" ng-click="goHome()" class="logoKnowage"><img src="<%=urlBuilder.getResourceLinkByTheme(request, "/css/menuBar/logo_knowage.png", currTheme)%>" /></a>
 	
 </div>
 <menu-aside></menu-aside>

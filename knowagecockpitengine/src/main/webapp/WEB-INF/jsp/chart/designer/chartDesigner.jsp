@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		<%@include file="/WEB-INF/jsp/chart/designer/chartImport.jsp"%>
 		<%@include file="/WEB-INF/jsp/chart/execution/chartRenderImport.jsp"%> 
 	
-		<link rel="stylesheet" type="text/css" href="<%=GeneralUtilities.getSpagoBiContext()%>/themes/commons/css/customStyle.css">
+		<link rel="stylesheet" type="text/css" href="<%=urlBuilder.getResourcePath(spagoBiContext, "/themes/commons/css/customStyle.css")%>">
 		
 	
 		<script>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 	</head>
 
 	<body class="bodyStyle kn-chartdesigner" ng-controller="ChartDesignerController">
-		<form name="userForm" layout="column" layout-fill ng-submit="saveChartTemplate()">
+		<form name="userForm" layout="column" layout-fill ng-submit="saveChartTemplate(true)"><!-- izmena -->
 		<div layout-fill style='position:fixed;z-index: 500;background:rgba(0,0,0, 0.3);' ng-if="!chartTypes.length>0">
 			<md-progress-circular md-mode="indeterminate" style='top:50%;left:50%' ng-disabled="chartTypes.length>0"></md-progress-circular>
 		</div>
@@ -73,7 +73,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- 				<md-button aria-label="Preview" ng-click="testChart()">TEST</md-button> -->
 				<!--commented perview button -->
 
-				<md-button aria-label="Preview" ng-if="previewChartEnable" ng-disabled="userForm.$invalid" ng-click="previewChart()">{{translate.load("sbi.generic.preview")}}</md-button> 
 				<md-button aria-label="Save" type="submit" ng-disabled="userForm.$invalid">{{translate.load("sbi.generic.save")}}</md-button>
 				<md-button aria-label="Back" ng-click="goBackFromDesigner()">{{translate.load("sbi.generic.back")}}</md-button>
 			</div>
@@ -91,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
             </md-tab-label>
             
-            <md-tab-body>
+            <md-tab-body ng-if="chartTemplate">
                 <div flex><chartstructure-tab></chartstructure-tab></div>
             </md-tab-body>
 			
@@ -107,13 +106,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
             </md-tab-label>
             
-            <md-tab-body>
+            <md-tab-body ng-if="chartTemplate">
                 <div flex><configuration-tab></configuration-tab></div>
             </md-tab-body>
 			
 			</md-tab> 
 
-			<md-tab label='{{translate.load("sbi.chartengine.designer.tab.advanced");}}' md-on-select="refreshJsonTree()"><advanced-tab></advanced-tab> </md-tab> 
+			<md-tab label='{{translate.load("sbi.chartengine.designer.tab.advanced");}}' md-on-select="refreshJsonTree()"><advanced-tab ng-if="chartTemplate"></advanced-tab> </md-tab> 
 		</md-tabs>
 		</form>
 

@@ -48,9 +48,9 @@ angular.module('cockpitModule')
 	   };
 });
 
-function cockpitSelectionWidgetControllerFunction($scope,cockpitModule_widgetConfigurator,$mdPanel,cockpitModule_template,cockpitModule_datasetServices,$mdDialog,sbiModule_translate,$q,sbiModule_messaging,cockpitModule_documentServices,cockpitModule_widgetSelection,cockpitModule_properties){
+function cockpitSelectionWidgetControllerFunction($scope,$timeout,cockpitModule_widgetConfigurator,$mdPanel,cockpitModule_template,cockpitModule_datasetServices,$mdDialog,sbiModule_translate,$q,sbiModule_messaging,cockpitModule_documentServices,cockpitModule_widgetSelection,cockpitModule_properties,cockpitModule_templateServices){
 	$scope.translate = sbiModule_translate;
-
+	$scope.widgetIsInit=false;
 	$scope.property={
 		style:{}
 	};
@@ -67,8 +67,13 @@ function cockpitSelectionWidgetControllerFunction($scope,cockpitModule_widgetCon
 		$scope.refreshWidget(null, 'init');
 	};
 
-	$scope.refresh=function(element,width,height){
-
+	$scope.refresh=function(element,width,height,datasetRecords, nature){
+		if(nature == 'init'){
+			$timeout(function(){
+				$scope.widgetIsInit=true;
+				cockpitModule_properties.INITIALIZED_WIDGETS.push($scope.ngModel.id);
+			},500);
+		}
 	};
 
 	$scope.filterForInitialSelection=function(obj){
@@ -92,13 +97,21 @@ function cockpitSelectionWidgetControllerFunction($scope,cockpitModule_widgetCon
 		}
 		return false;
 	}
-
+	
+	if($scope.ngModel && $scope.ngModel.style && !$scope.ngModel.style.chips) $scope.ngModel.style.chips = {};
+	
 	$scope.getSelections=function(){
 		$scope.selection = [];
 		$scope.tmpSelection = [];
 		angular.copy(cockpitModule_template.configuration.aggregations,$scope.tmpSelection);
 		$scope.tmpFilters = {};
 		angular.copy(cockpitModule_template.configuration.filters,$scope.tmpFilters);
+		
+		
+
+		var dsIdsInSameSheet = cockpitModule_templateServices.getDatasetIdsInSameSheet($scope.ngModel.id);
+		var dsLabelsInSameSheet = cockpitModule_datasetServices.getDatasetLabelsByIds(dsIdsInSameSheet);
+		var associatedDsLabels = cockpitModule_templateServices.getAssociatedDatasetLabels(dsLabelsInSameSheet);
 
 		if($scope.tmpSelection.length >0){
 			for(var i=0;i<$scope.tmpSelection.length;i++){
@@ -120,24 +133,12 @@ function cockpitSelectionWidgetControllerFunction($scope,cockpitModule_widgetCon
 						aggregated:true
 					};
 
-					if(!$scope.filterForInitialSelection(obj)){
+					if((associatedDsLabels.indexOf(obj.ds) > -1 || dsLabelsInSameSheet.indexOf(obj.ds) > -1) && !$scope.filterForInitialSelection(obj)){
 						$scope.selection.push(obj);
 					}
 				}
 			}
 		}
-
-		$scope.getRowStyle = function(even){
-			var style = {};
-        	if($scope.ngModel.style && $scope.ngModel.style.row && $scope.ngModel.style.row.height) {
-        		style.height = $scope.ngModel.style.row.height;
-        		style['min-height'] = $scope.ngModel.style.row.height;
-        	}
-        	if($scope.ngModel.style && $scope.ngModel.style.alternateRows && $scope.ngModel.style.alternateRows.enabled){
-        		style['background-color'] = even ? $scope.ngModel.style.alternateRows.evenRowsColor : $scope.ngModel.style.alternateRows.oddRowsColor;
-        	}
-        	return style;
-		};
 
 		for(var ds in $scope.tmpFilters){
 			for(var col in $scope.tmpFilters[ds]){
@@ -156,12 +157,24 @@ function cockpitSelectionWidgetControllerFunction($scope,cockpitModule_widgetCon
 					aggregated:false
 				};
 
-				if(!$scope.filterForInitialFilter(tmpObj)){
+				if((associatedDsLabels.indexOf(tmpObj.ds) > -1 || dsLabelsInSameSheet.indexOf(tmpObj.ds) > -1) && !$scope.filterForInitialFilter(tmpObj)){
 					$scope.selection.push(tmpObj);
 				}
 			}
 		}
 	}
+
+	$scope.getRowStyle = function(even){
+        var style = {};
+        if($scope.ngModel.style && $scope.ngModel.style.row && $scope.ngModel.style.row.height) {
+            style.height = $scope.ngModel.style.row.height;
+            style['min-height'] = $scope.ngModel.style.row.height;
+        }
+        if($scope.ngModel.style && $scope.ngModel.style.alternateRows && $scope.ngModel.style.alternateRows.enabled){
+            style['background-color'] = even ? $scope.ngModel.style.alternateRows.evenRowsColor : $scope.ngModel.style.alternateRows.oddRowsColor;
+        }
+        return style;
+    };
 
 	$scope.getColumnAlias = function(dsName, columnName){
 		var columnAlias = columnName;
@@ -288,14 +301,18 @@ function cockpitSelectionWidgetControllerFunction($scope,cockpitModule_widgetCon
 			controller: function($scope,finishEdit,sbiModule_translate,model,mdPanelRef,$mdToast){
 				$scope.translate=sbiModule_translate;
 				
-				
 				$scope.localModel = {};
 				angular.copy(model,$scope.localModel);
 				$scope.colorPickerPropertyEvenOddRows={format:'rgb', placeholder:sbiModule_translate.load('sbi.cockpit.color.select'),disabled:!$scope.localModel.style || !$scope.localModel.style.alternateRows || !$scope.localModel.style.alternateRows.enabled};
-				
 				$scope.changeAlternatedRows = function(){
 					$scope.colorPickerPropertyEvenOddRows.disabled = !$scope.localModel.style.alternateRows.enabled;
 				}
+				
+				$scope.colorPickerPropertyChips = {format:'rgb', placeholder:sbiModule_translate.load('sbi.cockpit.color.select'),disabled:!$scope.localModel.style.chips || !$scope.localModel.style.chips.enabled};
+				$scope.toggleChips = function(){
+					$scope.colorPickerPropertyChips.disabled = $scope.localModel.style.chips.enabled ? false : true;
+				}
+				
 				
 				$scope.saveConfiguration=function(){
 					angular.copy($scope.localModel,model);

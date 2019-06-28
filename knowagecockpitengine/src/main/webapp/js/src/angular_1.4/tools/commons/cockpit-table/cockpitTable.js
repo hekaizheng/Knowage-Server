@@ -22,7 +22,7 @@
 	currentScriptPath = currentScriptPath.substring(0, currentScriptPath.lastIndexOf('/') + 1);
 
     angular.module('cockpitTable', [])
-        .directive('cockpitTable', ['$mdDialog', 'sbiModule_translate',function($mdDialog, sbiModule_translate) {
+        .directive('cockpitTable', ['$mdDialog', 'sbiModule_translate', 'cockpitModule_generalServices', function($mdDialog, sbiModule_translate, cockpitModule_generalServices) {
 
             return {
                 restrict: "E",
@@ -36,6 +36,7 @@
                 templateUrl: currentScriptPath+'/templates/cockpitTable.tpl.html',
                 link: function(scope, elem, attr) {
                 	scope.translate = sbiModule_translate;
+                	scope.generalServices = cockpitModule_generalServices;
                     scope.loading = true; 			//initializing directive with the loading active
                     scope.settings.page = 1; 		//initial page number
                     scope.settings.rowsCount = 0;	//initial rows count
@@ -56,6 +57,14 @@
                     		return "'" + scope.settings.sortingColumn + "'";
                     	}
                 		return "";
+                    }    
+                    
+                    scope.datify = function(dateString,dateFormat){
+                    	var returningDate = moment(dateString, dateFormat).valueOf();
+                    	if(isNaN(returningDate)){
+                    		returningDate = dateString;
+                    	}
+                    	return  returningDate;
                     }
 
                     //returning if the order is ASC or DESC
@@ -103,7 +112,7 @@
                 			delete(style['max-width']);
                     		delete(style.width);
                 		}
-                    	if(column.style && column.style.td) scope.flexToAlign(scope.alignMap,column.style.td['justify-content'],style);
+                    	if(column.style && column.style['justify-content']) scope.flexToAlign(scope.alignMap,column.style['justify-content'],style);
                     	return style;
                     }
 
@@ -138,6 +147,8 @@
 
                     //function bind to the parent element. Passing mouse event, row and column data.
                     scope.selectCell = function(event, row, column) {
+                    	event.stopImmediatePropagation();
+                    	event.preventDefault();
 						 if(!scope.settings.multiselectable || column.fieldType == "MEASURE"){
 							 scope.clickItem(event,row,column);
 							 return;
@@ -184,11 +195,11 @@
                 		}
                 	}
 
-                	scope.getContainerStyle = function(column){
-                		var style = {};
-                		if(column.style && column.style.td && column.style.td['justify-content']) style['justify-content'] = column.style.td['justify-content'];
-                		return style;
-                	}
+//                	scope.getContainerStyle = function(column){
+//                		var style = {};
+//                		if(column.style && column.style.td && column.style.td['justify-content']) style['justify-content'] = column.style.td['justify-content'];
+//                		return style;
+//                	}
 
                 	//function passed to parent on click
                     scope.clickItem = function (event,row,column) {
@@ -246,12 +257,23 @@
                         }
                         return icon;
                     };
-
-                    scope.hasPrecision = function(column){
-                    	if(column.type == 'java.lang.Double' || column.type == 'java.lang.Float' || column.type == 'java.math.BigDecimal' || column.type == 'java.lang.Long' || column.type == 'java.lang.Integer'){return true}
-                    	return false;
+                    
+                    scope.dynamicIcon = function() {
+                    	if (!scope.$parent.ngModel && !scope.$parent.ngModel.cross) {
+                    		return;
+                    	}
+                    	if (scope.$parent.ngModel.cross.cross && scope.$parent.ngModel.cross.cross.enable && scope.$parent.ngModel.cross.cross.crossType == 'icon') {
+                    		return scope.$parent.ngModel.cross.cross.icon;
+                    	} else if (scope.$parent.ngModel.cross.preview && scope.$parent.ngModel.cross.preview.enable && scope.$parent.ngModel.cross.preview.previewType == 'icon') {
+                    		return scope.$parent.ngModel.cross.preview.icon;
+                    	}                    	
                     }
-
+                    
+                    scope.hasPrecision = function(column){
+                    	if(column.style && column.style.asString) return false;
+                    	return scope.generalServices.isNumericColumn(column);
+                    }
+                    
                     scope.isNumber = function(value){
                          return value != undefined && value.trim().length > 0 && !isNaN(value);
                     }

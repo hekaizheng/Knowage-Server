@@ -16,6 +16,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 --%>
 
+<%@page import="java.util.regex.Matcher"%>
+<%@page import="java.util.regex.Pattern"%>
 <%@page import="org.jgrapht.util.PrefetchIterator.NextElementFunctor"%>
 <%@page import="it.eng.spagobi.commons.dao.DAOFactory"%>
 <%@page import="it.eng.spagobi.analiticalmodel.document.dao.IBIObjectDAO"%>
@@ -161,6 +163,11 @@ if(executionRoleNames.size() > 0) {
         <!-- cross navigation -->
         <script type="text/javascript"  src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/commons/cross-navigation/crossNavigationDirective.js")%>"></script>
         <!--  -->
+        
+        <!-- dataset preview - Birt report -->
+		<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/documentexecution/birtReportDatasetPreview/datasetPreviewModule.js")%>"></script>
+		<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/documentexecution/birtReportDatasetPreview/datasetPreview_service.js")%>"></script>
+
         <style type="text/css">
             .requiredField {color: red!important; font-weight: bold;}
             .norequiredField {}
@@ -216,14 +223,13 @@ if(executionRoleNames.size() > 0) {
     
     %>
             <md-toolbar class="documentExecutionToolbar" flex="nogrow">
-                <div class="md-toolbar-tools" layout="row" layout-align="center center">
+                <div class="md-toolbar-tools noPadding" layout="row" layout-align="center center">
                     <md-button ng-if="navigatorEnabled" class="md-icon-button" ng-click="goBackHome()"
                             aria-label="homepage"
                             title="go to homepage">
                          <md-icon md-font-icon="fa fa-home"></md-icon>
                     </md-button>
-                    <span>&nbsp;&nbsp;</span>
-                    <h2 class="md-flex" ng-hide="::crossNavigationScope.isNavigationInProgress()">
+                    <h2 class="md-flex text-transform-none" style="padding-left: 8px" ng-hide="::crossNavigationScope.isNavigationInProgress()">
                         {{i18n.getI18n(executionInstance.OBJECT_NAME)}}
                     </h2>
                     <cross-navigation cross-navigation-helper="crossNavigationScope.crossNavigationHelper" flex>
@@ -278,7 +284,7 @@ if(executionRoleNames.size() > 0) {
                                 <md-icon md-font-icon="fa  fa-ellipsis-v"></md-icon>
                             </md-button>
                             <md-menu-content>
-                                <span class="divider">{{translate.load("sbi.ds.wizard.file")}}</span>
+                                <span class="divider" ng-if="canPrintDocuments">{{translate.load("sbi.ds.wizard.file")}}</span>
                                 <md-menu-item class="md-indent" ng-if="canPrintDocuments">
                                     <md-icon class="fa fa-print "></md-icon>
                                     <md-button ng-click="printDocument()">
@@ -448,11 +454,16 @@ if(executionRoleNames.size() > 0) {
                     <iframe class="noBorder" id="documentFrame" name="documentFrame" ng-src="{{execProperties.documentUrl}}" iframe-onload="iframeOnload()"
                         iframe-set-dimensions-onload flex ng-show="urlViewPointService.frameLoaded || browser.name == 'internet explorer'">
                     </iframe>
+                    <md-sidenav class="md-sidenav-right md-whiteframe-4dp lateralsidenav"  id="parametersPanelSideNav-e"
+			                ng-if="'<%=obj.getParametersRegion() %>' == 'east'" md-component-id="parametersPanelSideNav-e" 
+			                layout="column"
+			                ng-include="'<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/documentexecution/utils/sidenavTemplate/sidenavVertContent.jsp")%>'">
+			        </md-sidenav>
                 </md-content>
                                         
                 <div flex layout ng-if="currentView.status == 'PARAMETERS'"> 
                     <div ng-if="parameterView.status == 'FILTER_SAVED'" layout flex>
-                        <parameter-view-point-handler flex layout="column"/>
+                        <parameter-view-point-handler flex layout="column" execProperties="execProperties" execute="execute"/>
                     </div>
                     <div ng-if="parameterView.status == 'SCHEDULER'" layout flex>
                         <document-scheduler flex layout="column"/>
@@ -468,18 +479,14 @@ if(executionRoleNames.size() > 0) {
             </div>
         </div>
         
-        <md-sidenav class="md-sidenav-left md-whiteframe-4dp lateralsidenav"  
-                ng-if="'<%=obj.getParametersRegion() %>' == 'east'" md-component-id="parametersPanelSideNav" 
-                layout="column" md-is-locked-open="showParametersPanel.status" 
-                ng-include="'<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/documentexecution/utils/sidenavTemplate/sidenavVertContent.jsp")%>'">
-        </md-sidenav>
+        
 
         <script type="text/javascript">
         ///Module creation
         (function() {
             
             angular.module('documentExecutionModule', 
-                    ['ngMaterial', 'ui.tree', 'sbiModule', 'document_tree', 'componentTreeModule', 'angular_table', 'ngSanitize', 'expander-box', 'ngAnimate', 'ngWYSIWYG','angular_list','cross_navigation','file_upload','driversExecutionModule']);
+                    ['ngMaterial', 'ui.tree', 'sbiModule', 'document_tree', 'componentTreeModule', 'angular_table', 'ngSanitize', 'expander-box', 'ngAnimate', 'ngWYSIWYG','angular_list','cross_navigation','file_upload','driversExecutionModule', 'datasetPreviewModule']);
             
             
             
@@ -496,7 +503,7 @@ if(executionRoleNames.size() > 0) {
                         'OBJECT_ID' : <%= request.getParameter("OBJECT_ID") %>,
                         'OBJECT_LABEL' : '<%= request.getParameter("OBJECT_LABEL") %>',
                         'EDIT_MODE' : '<%= request.getParameter("EDIT_MODE") %>',
-                        'OBJECT_NAME' : '<%= obj.getName() %>',
+                        'OBJECT_NAME' : '<%= obj.getName().replaceAll(Pattern.quote("'"), Matcher.quoteReplacement("\\'")) %>',
                         'REFRESH_SECONDS' : <%= obj.getRefreshSeconds().intValue() %>,
                         'OBJECT_TYPE_CODE' : '',
                         'isFromCross' : <%=isFromCross%>,

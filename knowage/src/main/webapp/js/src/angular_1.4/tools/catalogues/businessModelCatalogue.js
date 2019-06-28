@@ -149,6 +149,7 @@ function businessModelCatalogueFunction(sbiModule_translate, sbiModule_restServi
 				$scope.metaWebFunctionality=false;
 				$scope.businessModelForm.$setPristine();
 				$scope.businessModelForm.$setUntouched();
+				 driversService.setDriverRelatedObject($scope.selectedBusinessModel);
 			}else{
 				$mdDialog.show($scope.confirm).then(function(){
 					angular.copy(item,$scope.selectedBusinessModel);
@@ -306,7 +307,7 @@ function businessModelCatalogueFunction(sbiModule_translate, sbiModule_restServi
 	  					activeFlagStyle();
 	  					millisToDate($scope.bmVersions);
 	  					$scope.versionLoadingShow = false;
-	  				//	$scope.$apply();
+	  					$scope.$apply();
 					 },600);
 			}, function(response) {
 				sbiModule_messaging.showErrorMessage(response.data.errors[0].message, 'Error');
@@ -350,7 +351,7 @@ function businessModelCatalogueFunction(sbiModule_translate, sbiModule_restServi
 					angular.copy($scope.selectedBusinessModel,$scope.savedBusinessModel);
 					$scope.businessModelList.push(response.data);
 					$scope.selectedVersions=[];
-
+					DriversService.driverRelatedObject = $scope.selectedBusinessModel;
 					DriversService.persistDrivers($scope.selectedBusinessModel.id, requiredPath);
 					DriversService.persistVisualDependency($scope.selectedBusinessModel.id, requiredPath);
 					DriversService.persistDataDependency($scope.selectedBusinessModel.id, requiredPath);
@@ -736,7 +737,7 @@ function businessModelCatalogueFunction(sbiModule_translate, sbiModule_restServi
 								controller: generateDatamartOptionsController,
 								preserveScope: true,
 								locals: {selectedBusinessModel:$scope.selectedBusinessModel,userId:sbiModule_user.userId,catalogName:catalogName,schemaName:schemaName,parentController:$scope},
-								templateUrl:sbiModule_config.contextName + '/js/src/angular_1.4/tools/catalogues/templates/generateDatamartOptions.html',
+								templateUrl:sbiModule_config.dynamicResourcesBasePath + '/angular_1.4/tools/catalogues/templates/generateDatamartOptions.html',
 								clickOutsideToClose:false,
 								escapeToClose :false,
 								fullscreen: true

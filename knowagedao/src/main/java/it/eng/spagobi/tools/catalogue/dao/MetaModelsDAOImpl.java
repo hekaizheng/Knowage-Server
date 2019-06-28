@@ -20,6 +20,7 @@ package it.eng.spagobi.tools.catalogue.dao;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.log4j.LogMF;
 import org.apache.log4j.Logger;
@@ -35,13 +36,12 @@ import com.jamonapi.MonitorFactory;
 
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.BIMetaModelParameter;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.Parameter;
-import it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.BIMetaModelDAOHibImpl;
+import it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.BIMetaModelParameterDAOHibImpl;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.IParameterDAO;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.metadata.SbiMetaModelParameter;
 import it.eng.spagobi.commons.dao.AbstractHibernateDAO;
 import it.eng.spagobi.commons.dao.DAOFactory;
 import it.eng.spagobi.commons.dao.SpagoBIDAOException;
-import it.eng.spagobi.commons.utilities.UserUtilities;
 import it.eng.spagobi.tools.catalogue.bo.Content;
 import it.eng.spagobi.tools.catalogue.bo.MetaModel;
 import it.eng.spagobi.tools.catalogue.metadata.SbiMetaModel;
@@ -72,7 +72,7 @@ public class MetaModelsDAOImpl extends AbstractHibernateDAO implements IMetaMode
 			SbiMetaModelParameter hibMetaModelPar = null;
 			Iterator it = hibMetaModelPars.iterator();
 			BIMetaModelParameter tmpBIMetaModelParameter = null;
-			BIMetaModelDAOHibImpl aBIMetaModelParameterDAOHibImpl = new BIMetaModelDAOHibImpl();
+			BIMetaModelParameterDAOHibImpl aBIMetaModelParameterDAOHibImpl = new BIMetaModelParameterDAOHibImpl();
 			IParameterDAO aParameterDAO = DAOFactory.getParameterDAO();
 			List metaModelParameters = new ArrayList();
 			Parameter aParameter = null;
@@ -139,7 +139,7 @@ public class MetaModelsDAOImpl extends AbstractHibernateDAO implements IMetaMode
 			SbiMetaModelParameter hibMetaModelPar = null;
 			Iterator it = hibMetaModelPars.iterator();
 			BIMetaModelParameter tmpBIMetaModelParameter = null;
-			BIMetaModelDAOHibImpl aBIMetaModelParameterDAOHibImpl = new BIMetaModelDAOHibImpl();
+			BIMetaModelParameterDAOHibImpl aBIMetaModelParameterDAOHibImpl = new BIMetaModelParameterDAOHibImpl();
 			IParameterDAO aParameterDAO = DAOFactory.getParameterDAO();
 			List metamodelParameters = new ArrayList();
 			Parameter aParameter = null;
@@ -223,8 +223,6 @@ public class MetaModelsDAOImpl extends AbstractHibernateDAO implements IMetaMode
 		monitor.stop();
 		return businessModel;
 	}
-
-
 
 	@Override
 	public MetaModel loadMetaModelById(Integer id) {
@@ -682,12 +680,30 @@ public class MetaModelsDAOImpl extends AbstractHibernateDAO implements IMetaMode
 			}
 
 			SbiMetaModel hibModel = (SbiMetaModel) session.load(SbiMetaModel.class, modelId);
-			if (hibModel == null) {
-				logger.warn("Model with id [" + modelId + "] not found");
-			} else {
-				session.delete(hibModel);
+
+			Set<SbiMetaModelParameter> metaModelParameters = hibModel.getSbiMetaModelParameters();
+			if (metaModelParameters != null) {
+				// delete dependencies between drivers
+				Iterator itMetaModelParDep = metaModelParameters.iterator();
+				BIMetaModelParameterDAOHibImpl metaModelParDAO = new BIMetaModelParameterDAOHibImpl();
+				while (itMetaModelParDep.hasNext()) {
+					SbiMetaModelParameter aSbiObjPar = (SbiMetaModelParameter) itMetaModelParDep.next();
+					BIMetaModelParameter aBIMetaModelParameter = new BIMetaModelParameter();
+					aBIMetaModelParameter.setId(aSbiObjPar.getMetaModelParId());
+					metaModelParDAO.eraseBIMetaModelParameterDependencies(aBIMetaModelParameter, session);
+				}
+
+				// delete drivers associated to business model
+				Iterator itMetaModelPar = metaModelParameters.iterator();
+				while (itMetaModelPar.hasNext()) {
+					SbiMetaModelParameter aSbiObjPar = (SbiMetaModelParameter) itMetaModelPar.next();
+					BIMetaModelParameter aBIMetaModelParameter = new BIMetaModelParameter();
+					aBIMetaModelParameter.setId(aSbiObjPar.getMetaModelParId());
+					metaModelParDAO.eraseBIMetaModelParameter(aBIMetaModelParameter);
+				}
 			}
 
+			session.delete(hibModel);
 			transaction.commit();
 		} catch (Exception e) {
 			logException(e);
@@ -715,6 +731,18 @@ public class MetaModelsDAOImpl extends AbstractHibernateDAO implements IMetaMode
 			toReturn.setName(hibModel.getName());
 			toReturn.setDescription(hibModel.getDescription());
 			toReturn.setCategory(hibModel.getCategory());
+
+			List metaModelParameters = new ArrayList();
+			Set<SbiMetaModelParameter> hibMetaModelPars = hibModel.getSbiMetaModelParameters();
+			if (hibMetaModelPars != null) {
+				for (Iterator it = hibMetaModelPars.iterator(); it.hasNext();) {
+					SbiMetaModelParameter aSbiMetaModelPar = (SbiMetaModelParameter) it.next();
+					BIMetaModelParameter par = toBIMetaModelParameter(aSbiMetaModelPar);
+					metaModelParameters.add(par);
+				}
+				toReturn.setDrivers(metaModelParameters);
+			}
+
 			if (hibModel.getDataSource() != null) {
 				toReturn.setDataSourceLabel(DataSourceDAOHibImpl.toDataSource(hibModel.getDataSource()).getLabel());
 				toReturn.setDataSourceId(DataSourceDAOHibImpl.toDataSource(hibModel.getDataSource()).getDsId());
@@ -725,6 +753,26 @@ public class MetaModelsDAOImpl extends AbstractHibernateDAO implements IMetaMode
 		}
 		logger.debug("OUT");
 		return toReturn;
+	}
+
+	public BIMetaModelParameter toBIMetaModelParameter(SbiMetaModelParameter hibMetaModelPar) {
+		BIMetaModelParameter aBIMetaModelParameter = new BIMetaModelParameter();
+		aBIMetaModelParameter.setId(hibMetaModelPar.getMetaModelParId());
+		aBIMetaModelParameter.setLabel(hibMetaModelPar.getLabel());
+		aBIMetaModelParameter.setModifiable(new Integer(hibMetaModelPar.getModFl().intValue()));
+		aBIMetaModelParameter.setMultivalue(new Integer(hibMetaModelPar.getMultFl().intValue()));
+		aBIMetaModelParameter.setBiMetaModelID(hibMetaModelPar.getSbiMetaModel().getId());
+		aBIMetaModelParameter.setParameterUrlName(hibMetaModelPar.getParurlNm());
+		aBIMetaModelParameter.setParID(hibMetaModelPar.getSbiParameter().getParId());
+		aBIMetaModelParameter.setRequired(new Integer(hibMetaModelPar.getReqFl().intValue()));
+		aBIMetaModelParameter.setVisible(new Integer(hibMetaModelPar.getViewFl().intValue()));
+		aBIMetaModelParameter.setPriority(hibMetaModelPar.getPriority());
+		aBIMetaModelParameter.setProg(hibMetaModelPar.getProg());
+		Parameter parameter = new Parameter();
+		parameter.setId(hibMetaModelPar.getSbiParameter().getParId());
+		parameter.setType(hibMetaModelPar.getSbiParameter().getParameterTypeCode());
+		aBIMetaModelParameter.setParameter(parameter);
+		return aBIMetaModelParameter;
 	}
 
 	@Override
@@ -1365,9 +1413,9 @@ public class MetaModelsDAOImpl extends AbstractHibernateDAO implements IMetaMode
 			logger.debug("MetaModel loaded");
 			MetaModel model = toModel(hibMetaModel);
 			// Admin can force unlock from other
-			boolean isAdmin = UserUtilities.isAdministrator(UserUtilities.getUserProfile(userId));
+			// boolean isAdmin = UserUtilities.isAdministrator(UserUtilities.getUserProfile(userId));
 
-			if ((model.getModelLocked().equals(true) && model.getModelLocker().equals(userId)) || (isAdmin)) {
+			if ((model.getModelLocked().equals(true) && model.getModelLocker().equals(userId))) {
 				// set to "not active" the current active model
 				String hql = " update SbiMetaModel ar set ar.modelLocked = ?, ar.modelLocker = ? where ar.modelLocked = ?  and ar.id = ? ";
 				Query query = session.createQuery(hql);

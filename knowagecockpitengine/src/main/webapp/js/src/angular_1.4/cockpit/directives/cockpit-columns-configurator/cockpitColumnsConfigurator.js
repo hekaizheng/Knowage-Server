@@ -21,6 +21,8 @@
 		$scope.cockpitModule_generalOptions=cockpitModule_generalOptions;
 		$scope.availableDatasets=cockpitModule_datasetServices.getAvaiableDatasets();
 
+		$scope.availableAggregations = ["NONE","SUM","AVG","MAX","MIN","COUNT","COUNT_DISTINCT"];
+
 		if(!$scope.model.settings.modalSelectionColumn){
 			$scope.model.settings.modalSelectionColumn="";
 		}
@@ -82,27 +84,54 @@
 			}
 		}
 		$scope.colorPickerProperty={format:'rgb'}
-		
+
 		$scope.columnsGrid = {
 			angularCompileRows: true,
+			domLayout :'autoHeight',
 	        enableColResize: false,
 	        enableFilter: false,
 	        enableSorting: false,
+	        onRowDragMove: onRowDragMove,
 	        onGridReady : resizeColumns,
+	        onCellEditingStopped: refreshRow,
+	        singleClickEdit: true,
+	        stopEditingWhenGridLosesFocus: true,
 	        columnDefs: [
-	        	{headerName:'Order', cellRenderer: orderRenderer, field:'order',width: 100,suppressSizeToFit:true,sort: 'asc',"cellStyle":{"border":"none !important","display":"inline-flex","justify-content":"center"}},
-	        	{headerName:'Name', field:'name'},
-	        	{headerName:'Alias', field:'alias'},
-	        	{headerName:'Aggregation', cellRenderer: aggregationRenderer},
-	        	{headerName:'Type', field: 'fieldType'},
+	        	//{headerName:'Order', cellRenderer: orderRenderer, field:'order',width: 100,suppressSizeToFit:true,sort: 'asc',"cellStyle":{"border":"none !important","display":"inline-flex","justify-content":"center"}},
+	        	{headerName: $scope.translate.load('sbi.cockpit.widgets.table.column.name'), field:'name',"editable":isInputEditable,cellRenderer:editableCell, cellClass: 'editableCell',rowDrag: true},
+	        	{headerName: $scope.translate.load('sbi.cockpit.widgets.table.column.alias'), field:'aliasToShow',"editable":true,cellRenderer:editableCell, cellClass: 'editableCell'},
+	        	{headerName: $scope.translate.load('sbi.cockpit.widgets.table.column.type'), field: 'fieldType',"editable":true,cellRenderer:editableCell, cellClass: 'editableCell',cellEditor:"agSelectCellEditor",
+	        		cellEditorParams: {values: ['ATTRIBUTE','MEASURE']}},
+	        	{headerName: $scope.translate.load('sbi.cockpit.widgets.table.column.aggregation'), field: 'aggregationSelected', cellRenderer: aggregationRenderer,"editable":isAggregationEditable, cellClass: 'editableCell',
+	        		cellEditor:"agSelectCellEditor",cellEditorParams: {values: $scope.availableAggregations}},
 	        	{headerName:"",cellRenderer: buttonRenderer,"field":"valueId","cellStyle":{"border":"none !important","text-align": "right","display":"inline-flex","justify-content":"flex-end"},width: 150,suppressSizeToFit:true, tooltip: false}],
 			rowData: $scope.model.content.columnSelectedOfDataset
 		}
-		
+
+		function onRowDragMove(event) {
+		    if (event.node !== event.overNode) {
+		    	var fromIndex = $scope.model.content.columnSelectedOfDataset.indexOf(event.node.data);
+		    	var toIndex = $scope.model.content.columnSelectedOfDataset.indexOf(event.overNode.data);
+
+		    	var newStore = $scope.model.content.columnSelectedOfDataset.slice();
+		        moveInArray(newStore, fromIndex, toIndex);
+		        $scope.model.content.columnSelectedOfDataset = newStore;
+
+		        $scope.columnsGrid.api.setRowData(newStore);
+		        $scope.columnsGrid.api.clearFocusedCell();
+		    }
+
+		    function moveInArray(arr, fromIndex, toIndex) {
+		        var element = arr[fromIndex];
+		        arr.splice(fromIndex, 1);
+		        arr.splice(toIndex, 0, element);
+		    }
+		}
+
 		function resizeColumns(){
 			$scope.columnsGrid.api.sizeColumnsToFit();
 		}
-		
+
 		function orderRenderer(params){
 			if(!params.data.order) {
 				params.data.order = params.rowIndex;
@@ -112,23 +141,44 @@
 			var downButton = params.data.order != $scope.columnsGrid.api.getDisplayedRowCount()-1 ?  '<md-button ng-click="moveDown($event,'+params.data.order+')" class="md-icon-button h20" aria-label="up"><md-icon md-font-icon="fa fa-arrow-down"></md-icon></md-button>' : '';
 			return 	'<div layout="row">'+
 						upButton+
+						params.data.order+
 						downButton+
 				 	'</div>';
 		}
-		
-		function aggregationRenderer(params){
-			return params.data.fieldType == "MEASURE" ? params.data.aggregationSelected : '';
+
+		function editableCell(params){
+			return typeof(params.value) !== 'undefined' ? '<i class="fa fa-edit"></i> <i>'+params.value+'<md-tooltip>'+params.value+'</md-tooltip></i>' : '';
 		}
-		
+		function isInputEditable(params) {
+			return typeof(params.data.name) !== 'undefined';
+		}
+		function isAggregationEditable(params) {
+			return params.data.fieldType == "MEASURE" ? true : false;
+		}
+
+		function aggregationRenderer(params) {
+			var aggregation = '<i class="fa fa-edit"></i> <i>'+params.value+'</i>';
+			return params.data.fieldType == "MEASURE" ? aggregation : '';
+		}
+
 		function buttonRenderer(params){
-			if(params.data.style) var color = params.data.style.color;
-			return 	'<md-button class="md-icon-button noMargin" ng-click="draw(\''+params.data.name+'\')">'+
-					'	<md-icon style="color:'+color+'" md-font-icon="fa fa-paint-brush" aria-label="Paint brush"></md-icon>'+
+			var calculator = '';
+			if(params.data.isCalculated){
+				calculator = '<md-button class="md-icon-button" ng-click="addNewCalculatedField(\''+params.rowIndex+'\')">'+
+							 '<md-icon md-font-icon="fa fa-calculator"></md-icon><md-tooltip md-delay="500">{{::translate.load("sbi.cockpit.widgets.table.inlineCalculatedFields.title")}}</md-tooltip></md-button>';
+			}
+			return 	calculator +
+					'<md-button class="md-icon-button noMargin" ng-click="draw(\''+params.data.name+'\')" ng-style="{\'background-color\':model.content.columnSelectedOfDataset['+params.rowIndex+'].style[\'background-color\']}">'+
+					'   <md-tooltip md-delay="500">{{::translate.load("sbi.cockpit.widgets.table.columnstyle.icon")}}</md-tooltip>'+
+					'	<md-icon ng-style="{\'color\':model.content.columnSelectedOfDataset['+params.rowIndex+'].style.color}" md-font-icon="fa fa-paint-brush" aria-label="Paint brush"></md-icon>'+
 					'</md-button>'+
-					'<md-button class="md-icon-button" ng-click="editRow(\''+params.data.name+'\',$event)"><md-icon md-font-icon="fa fa-pencil"></md-icon></md-button>'+
-					'<md-button class="md-icon-button" ng-click="deleteColumn(\''+params.data.name+'\',$event)"><md-icon md-font-icon="fa fa-trash"></md-icon></md-button>';
+					'<md-button class="md-icon-button" ng-click="deleteColumn(\''+params.data.name+'\',$event)"><md-icon md-font-icon="fa fa-trash"></md-icon><md-tooltip md-delay="500">{{::translate.load("sbi.cockpit.widgets.table.column.delete")}}</md-tooltip></md-button>';
 		}
-		
+
+		function refreshRow(cell){
+			$scope.columnsGrid.api.redrawRows({rowNodes: [$scope.columnsGrid.api.getDisplayedRowAtIndex(cell.rowIndex)]});
+		}
+
 		$scope.moveUp = function(evt,index){
 			evt.stopImmediatePropagation();
 			for(var k in $scope.model.content.columnSelectedOfDataset){
@@ -145,12 +195,12 @@
 			}
 			$scope.columnsGrid.api.setRowData($scope.model.content.columnSelectedOfDataset);
 		};
-		
+
 		$scope.draw = function(rowName) {
 			for(var k in $scope.model.content.columnSelectedOfDataset){
 				if($scope.model.content.columnSelectedOfDataset[k].name == rowName) $scope.selectedColumn = $scope.model.content.columnSelectedOfDataset[k];
 			}
-			
+
 			$mdDialog.show({
 				templateUrl:  baseScriptPath+ '/directives/cockpit-columns-configurator/templates/cockpitColumnStyle.html',
 				parent : angular.element(document.body),
@@ -167,7 +217,7 @@
 				console.log("Selected column:", $scope.selectedColumn);
 			});
 		},
-		
+
 		$scope.deleteColumn = function(rowName,event) {
 			for(var k in $scope.model.content.columnSelectedOfDataset){
 				if($scope.model.content.columnSelectedOfDataset[k].name == rowName) var item = $scope.model.content.columnSelectedOfDataset[k];
@@ -185,137 +235,6 @@
 				$scope.columnsGrid.api.sizeColumnsToFit();
 			}
 		})
-		
-
-		$scope.actionsOfCockpitColumns = [{
-	    	  icon:'fa fa-calculator' ,
-	    	  action : function(item,event) {
-	    		  $scope.addNewCalculatedField(item);
-	    	  },
-	    	  visible : function(row,column) {
-	    		  if(row.isCalculated){
-	    			  return true;
-	    		  }
-	    		  return false;
-	    	  }
-	      } ,
-	      {
-	    	  icon:'fa fa-sliders' ,
-	    	  action : function(item,event) {
-	    		  $scope.addSummaryInfo(item);
-	    	  },
-	    	  visible : function(row,column) {
-	    		  if(row.fieldType == "MEASURE"){
-	    			  return true;
-	    		  }
-	    		  return false;
-	    	  }
-	      } ,
-	      {
-	    	  icon:'fa fa-trash' ,
-	    	  action : function(item,event) {
-	    		  var index=$scope.model.content.columnSelectedOfDataset.indexOf(item);
-	    		  $scope.model.content.columnSelectedOfDataset.splice(index,1);
-	    		  if($scope.model.settings.sortingColumn == item.aliasToShow){
-	    			  $scope.model.settings.sortingColumn = null;
-	    		  }
-	    	  }
-	      }];
-
-
-		$scope.metadataTableColumns=[
-		                             {
-		                            	 label:"  ",
-		                            	 name:"move",
-		                            	 size:"100px",
-		                            	 transformer:function(item){
-		                            		 var template = "<div layout=\"row\"> "
-		                            			 +"<md-button ng-click=\"scopeFunctions.moveUp($event,$parent.$parent.$parent.$index)\" ng-disabled=\"$parent.$parent.$parent.$parent.$parent.$index==0\" class=\"md-icon-button h20 \" aria-label=\"up\">"
-		                            			 +"  <md-icon md-font-icon=\"fa fa-arrow-up\"></md-icon>"
-		                            			 +" </md-button>"
-		                            			 +" <md-button ng-click=\"scopeFunctions.moveDown($event,$parent.$parent.$parent.$index)\" ng-disabled=\"$parent.$parent.$parent.$parent.$parent.$last\" class=\"md-icon-button h20\" aria-label=\"down\">"
-		                            			 +" <md-icon md-font-icon=\"fa fa-arrow-down\"></md-icon>"
-		                            			 +"</md-button>"
-		                            			 +"</div>";
-		                            		 return template;
-		                            	 },
-		                            	 hideTooltip:true
-		                             },
-		                             {
-		                            	 "label":"Column",
-		                            	 "name":"alias",
-		                            	 transformer:function(item){
-		                            		 var template='<md-input-container class="md-block" ng-if="!row.isCalculated"> '
-		                            			 +'<md-select ng-model="row.alias" ng-change="scopeFunctions.changeColumn(row)">'
-		                            			 +'<md-option ng-repeat="col in scopeFunctions.columnList" ng-value="col.alias" >'
-		                            			 +'{{col.alias}}'
-		                            			 +'</md-option>'
-		                            			 +'</md-select></md-input-container>';
-
-		                            		 return template;
-		                            	 },
-		                            	 hideTooltip:true
-
-		                             },
-		                             {
-		                            	 "label":"Title",
-		                            	 "name":"aliasToShow",
-		                            	 transformer:function(item){
-		                            		 var template = "<md-input-container flex class=\"md-block noMdError\"> "
-		                            			 +"<label>Text</label>"
-		                            			 +"<input class=\"input_class\" ng-model=row.aliasToShow />"
-		                            			 +"</md-input-container>";
-		                            		 return template;
-		                            	 },
-		                            	 hideTooltip:true
-
-		                             },
-
-		                             {
-		                            	 "label":"Aggregation",
-		                            	 "name":"aggregation",
-		                            	 transformer:function(a,b,c){
-		                            		 var template='<md-input-container class="md-block"> '
-		                            			 +'<md-select  ng-show="scopeFunctions.canSee(row)" ng-if="scopeFunctions.AggregationFunctions != undefined" ng-model="row.aggregationSelected" aria-label="aria-label" >'
-		                            			 +'<md-option ng-repeat="agF in scopeFunctions.AggregationFunctions" ng-value="agF.value">'
-		                            			 +'{{agF.label}}'
-		                            			 +'</md-option>'
-		                            			 +'</md-select></md-input-container>';
-
-		                            		 return template;
-		                            	 },
-		                            	 hideTooltip:true
-		                             },
-		                             {
-		                            	 "label":"Type",
-		                            	 "name":"typeList",
-		                            	 transformer:function(){
-
-		                            		 var temp = '<md-input-container class="md-block"> '
-		                            			 +'<md-select aria-label="aria-label" ng-model="row.fieldType" ng-change="scopeFunctions.fieldTypeChanged()">'
-		                            			 +'<md-option value=""></md-option>'
-		                            			 +'<md-option value="ATTRIBUTE">String</md-option>'
-		                            			 +'<md-option value="MEASURE">Number</md-option>'
-		                            			 +'</md-select> </md-input-container>'
-		                            			 return temp;
-		                            	 },
-		                            	 hideTooltip:true
-		                             },{
-		                            	 "label":" ",
-		                            	 "name":" ",
-		                            	 transformer:function(row,column,index){
-
-		                            		 var temp = '<md-button class="md-icon-button noMargin" ng-style="{\'background\':row.style[\'background-color\']}" ng-click="scopeFunctions.draw(row,column,index)">'
-		                            			 +'<md-icon style="color:{{row.style.color}}" md-font-icon="fa fa-paint-brush" aria-label="Paint brush"></md-icon>'
-		                            			 +'</md-button>'
-
-		                            			 return temp;
-		                            	 },
-		                            	 size : "40px",
-		                            	 hideTooltip:true
-		                             }
-		                             ];
-
 
 		$scope.$watch('local',function(newValue,oldValue){
 			if($scope.functionsCockpitColumn.columnList && newValue && newValue.metadata.fieldsMeta != $scope.functionsCockpitColumn.columnList){
@@ -428,8 +347,8 @@
 
 		}
 
-		$scope.addNewCalculatedField = function(currentRow){
-
+		$scope.addNewCalculatedField = function(currentRowIndex){
+			var currentRow = $scope.model.content.columnSelectedOfDataset[currentRowIndex];
 			var deferred = $q.defer();
 			var promise ;
 			$mdDialog.show({
@@ -493,6 +412,37 @@ function controllerCockpitColumnsConfigurator($scope,sbiModule_translate,$mdDial
 		$scope.model.dataset= {};
 		angular.copy([], $scope.model.dataset.metadata.fieldsMeta);
 	}
+	
+	$scope.filterColumns = function(){
+		var tempColumnsList = $filter('filter')($scope.localDataset.metadata.fieldsMeta,$scope.columnsSearchText);
+		$scope.columnsGridOptions.api.setRowData(tempColumnsList);
+	}
+	
+	$scope.columnsGridOptions = {
+            enableColResize: false,
+            enableFilter: true,
+            enableSorting: true,
+            pagination: true,
+            paginationAutoPageSize: true,
+            onGridSizeChanged: resizeColumns,
+            rowSelection: 'multiple',
+			rowMultiSelectWithClick: true,
+            defaultColDef: {
+            	suppressMovable: true,
+            	tooltip: function (params) {
+                    return params.value;
+                },
+            },
+            columnDefs :[{"headerName":"Column","field":"alias",headerCheckboxSelection: true, checkboxSelection: true},
+        		{"headerName":"Field Type","field":"fieldType"},
+        		{"headerName":"Type","field":"type"}],
+        	rowData : $scope.localDataset.metadata.fieldsMeta
+	};
+	
+	function resizeColumns(){
+		$scope.columnsGridOptions.api.sizeColumnsToFit();
+	}
+
 	$scope.saveColumnConfiguration=function(){
 		model = $scope.model;
 
@@ -500,14 +450,12 @@ function controllerCockpitColumnsConfigurator($scope,sbiModule_translate,$mdDial
 			model.content.columnSelectedOfDataset = [];
 		}
 
-
-		for(var i=0;i<$scope.columnSelected.length;i++){
-			var obj = $scope.columnSelected[i];
-			obj.aggregationSelected = 'NONE';
-			obj["funcSummary"] = "NONE";
-			obj.typeSelected = $scope.columnSelected[i].type;
-			obj.label = $scope.columnSelected[i].alias;
-			obj.aliasToShow = $scope.columnSelected[i].alias;
+		for(var i in $scope.columnsGridOptions.api.getSelectedRows()){
+			var obj = $scope.columnsGridOptions.api.getSelectedRows()[i];
+			obj.aggregationSelected = 'SUM';
+			obj.typeSelected = obj.type;
+			obj.label = obj.alias;
+			obj.aliasToShow = obj.alias;
 			model.content.columnSelectedOfDataset.push(obj);
 		}
 
@@ -521,27 +469,32 @@ function controllerCockpitColumnsConfigurator($scope,sbiModule_translate,$mdDial
 
 function cockpitStyleColumnFunction($scope,sbiModule_translate,$mdDialog,$mdPanel,model,selectedColumn,cockpitModule_generalServices,cockpitModule_datasetServices,$mdToast,cockpitModule_generalOptions,sbiModule_messaging,knModule_fontIconsService){
 	$scope.translate=sbiModule_translate;
+	$scope.generalServices=cockpitModule_generalServices;
 	$scope.cockpitModule_generalOptions=cockpitModule_generalOptions;
+	$scope.model = model;
 	$scope.selectedColumn = angular.copy(selectedColumn);
-	$scope.fontWeight = ['normal','bold','bolder','lighter','number','initial','inherit'];
 	$scope.modelTextAlign = {"flex-start":sbiModule_translate.load('sbi.cockpit.style.textAlign.left'),"center":sbiModule_translate.load('sbi.cockpit.style.textAlign.center'),"flex-end":sbiModule_translate.load('sbi.cockpit.style.textAlign.right')};
 	$scope.formatPattern = ['#.###','#,###','#.###,##','#,###.##'];
 	$scope.colorPickerProperty={placeholder:sbiModule_translate.load('sbi.cockpit.color.select') ,format:'rgb'}
 	$scope.visTypes=['Chart','Text','Text & Chart','Icon only'];
 	$scope.icons=["fa fa-warning","fa fa-bell","fa fa-bolt","fa fa-commenting","fa fa-asterisk","fa fa-ban", "fa fa-check","fa fa-clock-o","fa fa-close","fa fa-exclamation-circle","fa fa-flag","fa fa-star"];
-	$scope.availableIcons = knModule_fontIconsService.icons;
+	$scope.availableIcons = knModule_fontIconsService.icons;	
 	
 	$scope.getTemplateUrl = function(template){
 		return cockpitModule_generalServices.getTemplateUrl('tableWidget',template)
 	}
 	
-	$scope.hasPrecision = function(column){
-		if(column.type == 'java.lang.Double' || column.type == 'java.lang.Float' || column.type == 'java.math.BigDecimal' || column.type == 'java.lang.Long' || column.type == 'java.lang.Integer'){
+	$scope.isDateColumn = function(type){
+		if(type == 'oracle.sql.TIMESTAMP' || type == 'java.sql.Timestamp' || type == 'java.util.Date' || type == 'java.sql.Date' || type == 'java.sql.Time'){
 			return true;
 		}
 		return false;
 	}
 	
+	$scope.hasPrecision = function(column){
+		return $scope.generalServices.isNumericColumn(column);
+	}
+
 	$scope.chooseIcon = function(range) {
 		$scope.tempVar = !$scope.tempVar;
 		$scope.currentRange=range;
@@ -551,8 +504,8 @@ function cockpitStyleColumnFunction($scope,sbiModule_translate,$mdDialog,$mdPane
 		$scope.currentRange.icon = family.className+' '+icon.className;
 		$scope.tempVar = !$scope.tempVar;
 	}
-	
-	
+
+
 	if(!$scope.selectedColumn.hasOwnProperty('colorThresholdOptions'))
 	{
 		$scope.selectedColumn.colorThresholdOptions={};

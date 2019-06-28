@@ -26,21 +26,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <html ng-app="qbeManager">
 
-	<body ng-controller="qbeController" class="kn-qbe md-knowage-theme">
+	<body ng-controller="qbeController" class="kn-qbe md-knowage-theme" layout="column">
 	<rest-loading></rest-loading>
-	<div layout="row">
-		<div flex=30 layout-fill class="qbeList">
+	<div ng-if="show" layout="row" flex>
+		<div flex=30 layout="column" >
+		
 			<qbe-expander-list 
-			flex drag-action="droppedFunction(data)" 
+			class="qbeList"
+			flex=75 drag-action="droppedFunction(data)" 
 			ng-model="entityModel" 
 			font-icons="fa" 
 			entities-actions="entitiesFunctions" 
 			fields-actions="fieldsFunctions" 
 			colors="colors">
         	</qbe-expander-list>
-        	
-        	<qbe-expander-list 
-			flex 
+    
+    <div flex=25 layout="column" class="qbeList">
+    	<qbe-expander-list 
+			flex
 			ng-model="subqueriesModel" 
 			font-icons="fa" 
 			entities-actions="queryFunctions"
@@ -52,16 +55,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		        	<md-icon md-menu-origin class="fa fa-plus-circle"></md-icon>
 		      	</md-button>
         	</qbe-expander-list>
+    </div>
+        	
+        	
 		</div>
 		<div flex layout="column">
 			<qbe-custom-table 
+			
 			ng-drop="true" 
 			ng-drop-success="onDropComplete($data,$event)" 
 			ng-model="queryModel" expression="expression" 
 			filters="filters" 
 			is-temporal ="(entityModel.entities | filter:'temporal_dimension').length > 0 " >
-				<div >
-					<md-button  ng-click="stopEditingSubqueries()">
+				<div layout="row">
+					<md-button  ng-if="subqueriesModel.subqueries.length > 0"ng-click="stopEditingSubqueries()">
                     	{{query.name}}
                 	</md-button>
                 	<md-icon ng-if="editQueryObj.name !== query.name" md-font-icon="fa fa-chevron-right"></md-icon>

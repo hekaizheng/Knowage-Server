@@ -117,8 +117,11 @@ public class ChartEngineDataUtil {
 		}
 		JSONObject jo = new JSONObject(jsonTemplate);
 		JSONObject category = jo.getJSONObject("CHART").getJSONObject("VALUES").getJSONObject("CATEGORY");
+		JSONObject drillOrder = category.optJSONObject("drillOrder");
+
 		String groupBys = category.optString("groupby");
 		String groupByNames = category.optString("groupbyNames");
+
 		Map<String, Object> mapTemplate = null;
 		JSONArray jaBreadcrumb = new JSONArray(breadcrumb);
 		if (groupBys != null) {
@@ -129,7 +132,6 @@ public class ChartEngineDataUtil {
 			String drilldownCategoryName = category.getString("name");
 			Object selectedCategory = null;
 			String[] gbys = groupBys.split(", ");
-			String[] gbyNames = (groupByNames != null && !groupByNames.isEmpty()) ? groupByNames.split(",") : gbys;
 			int i;
 			for (i = 0; i < jaBreadcrumb.length(); i++) {
 				JSONObject drilldown = (JSONObject) jaBreadcrumb.get(i);
@@ -138,7 +140,7 @@ public class ChartEngineDataUtil {
 				String selectedSerie = drilldown.getString("selectedSerie");
 				String dateFormat = drilldown.optString("dateFormatJava");
 				String gby = gbys[i];
-				String gbyName = (gbyNames.length > i) ? gbyNames[i] : gbys[i];
+				String gbyName = gbys[i];
 
 				drilldownParams.put(drilldownCategory, selectedName);
 
@@ -158,6 +160,18 @@ public class ChartEngineDataUtil {
 				categ.put("id", drilldownCategory);
 				categ.put("columnName", drilldownCategory);
 				categ.put("alias", drilldownCategory);
+
+				if (drillOrder != null) {
+
+					JSONObject drillOrderJO = (JSONObject) drillOrder.opt(drilldownCategory);
+					if (drillOrderJO != null) {
+						categ.put("orderColumn", drillOrderJO.optString("orderColumn"));
+						categ.put("orderType", drillOrderJO.optString("orderType"));
+					}
+				} else {
+
+				}
+
 				String key = "";
 				String value = "";
 
@@ -183,7 +197,7 @@ public class ChartEngineDataUtil {
 				jsonData = cockpitExecutionClient.getDataFromDataset(aggregationsToSend, aggregationsJson.getString("dataset"), userId, queryParams);
 
 			} else {
-			IQuery q = extractAggregatedQueryFromTemplate(jsonTemplate, true, drilldownSerie, drilldownCategory, drilldownParams);
+				IQuery q = extractAggregatedQueryFromTemplate(jsonTemplate, true, drilldownSerie, drilldownCategory, drilldownParams);
 				jsonData = loadJsonData(q, dataSet, analyticalDrivers, userProfile, locale, dateFormatJava);
 			}
 
@@ -208,7 +222,7 @@ public class ChartEngineDataUtil {
 			velocityContext.put("drilldownCategoryName", drilldownCategoryName);
 			velocityContext.put("enableNextDrilldown", enableNextDrilldown);
 
-			Template velocityTemplate = ve.getTemplate("/chart/templates/highcharts414/drilldowndata.vm");
+			Template velocityTemplate = ve.getTemplate("/chart/templates/highcharts/drilldowndata.vm");
 			result = ChartEngineUtil.applyTemplate(velocityTemplate, velocityContext);
 		}
 

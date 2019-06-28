@@ -45,10 +45,15 @@ public class DataSetTransformer {
 
 	public void print(Object object) {
 
-		// System.out.println("-----------------------");
-		// System.out.println(object);
-		// System.out.println(object.getClass().toString());
-		// System.out.println("-----------------------");
+		/*
+		 * System.out.println("-----------------------"); System.out.println(object); System.out.println(object.getClass().toString());
+		 * System.out.println("-----------------------");
+		 */
+
+		logger.debug("-----------------------");
+		logger.debug(object);
+		logger.debug(object.getClass().toString());
+		logger.debug("-----------------------");
 
 	}
 
@@ -733,12 +738,20 @@ public class DataSetTransformer {
 	}
 
 	public LinkedHashMap<String, ArrayList<JSONObject>> prepareDataForGrouping(List<Object> dataRows, String isCockpitEngine, String groupSeries,
-			String groupSeriesCateg) throws JSONException {
+			String groupSeriesCateg, Map<String, String> dataColumnsMapper, Map<String, String> categorieColumns, String groupedSerie) throws JSONException {
 		boolean isCockpit = Boolean.parseBoolean(isCockpitEngine);
 		boolean groupSeriesBool = Boolean.parseBoolean(groupSeries);
 		ArrayList<Object> categories = new ArrayList<>();
-
 		LinkedHashMap<String, ArrayList<JSONObject>> map = new LinkedHashMap<String, ArrayList<JSONObject>>();
+
+		String columnForGroupingSerie = "";
+		if (!groupSeriesBool) {
+			columnForGroupingSerie = dataColumnsMapper.get(groupedSerie).toLowerCase();
+		}
+		if (!categorieColumns.get("orderColumn").equals("") && !categorieColumns.get("orderColumn").equals(categorieColumns.get("column"))
+				&& !categorieColumns.get("groupby").contains(categorieColumns.get("orderColumn"))) {
+			dataColumnsMapper.remove(categorieColumns.get("orderColumn").toLowerCase());
+		}
 		String primCat;
 		String secCat;
 		String seria;
@@ -748,9 +761,9 @@ public class DataSetTransformer {
 				secCat = "column_2";
 				seria = "column_3";
 			} else {
-				primCat = "column_2";
-				secCat = "column_1";
-				seria = "column_3";
+				primCat = dataColumnsMapper.get(categorieColumns.get("column").toLowerCase());
+				secCat = columnForGroupingSerie;
+				seria = dataColumnsMapper.get(categorieColumns.get("groupby").toLowerCase());
 			}
 		} else {
 			if (groupSeriesBool) {
@@ -760,12 +773,15 @@ public class DataSetTransformer {
 
 			} else {
 				primCat = "column_1";
-				secCat = "column_3";
+				secCat = columnForGroupingSerie;
 				seria = "column_2";
 
 			}
-		}
 
+		}
+		logger.debug("primCat: " + primCat);
+		logger.debug("secCat: " + secCat);
+		logger.debug("seria: " + seria);
 		for (Object singleObject : dataRows) {
 			categories.add(((Map) singleObject).get(primCat));
 		}
@@ -778,24 +794,47 @@ public class DataSetTransformer {
 			categoriesListIndexMap.put(categoriesList[i], i);
 		}
 
-		for (Object singleObject : dataRows) {
-			ArrayList<JSONObject> newListOfOrderColumnItems = map.get(((Map) singleObject).get(seria).toString());
-			if (newListOfOrderColumnItems == null) {
-				newListOfOrderColumnItems = new ArrayList<JSONObject>();
-				for (int i = 0; i < categoriesList.length; i++) {
-					Object category = categoriesList[i];
-					JSONObject jo = new JSONObject();
-					jo.put("name", category);
-					jo.put("y", "");
-					newListOfOrderColumnItems.add(jo);
+		for (String key : dataColumnsMapper.keySet()) {
+			String newCol = "";
+
+			String serieValue = "";
+			for (Object singleObject : dataRows) {
+				if (!dataColumnsMapper.get(key).equals(primCat) && !dataColumnsMapper.get(key).equals(secCat)) {
+
+					if (!dataColumnsMapper.get(key).equals(seria)) {
+						newCol = key;
+						serieValue = ((Map) singleObject).get(dataColumnsMapper.get(key)).toString();
+					} else {
+
+						newCol = ((Map) singleObject).get(seria).toString();
+						serieValue = ((Map) singleObject).get(secCat).toString();
+
+					}
+
+				} else {
+					continue;
 				}
-				map.put(((Map) singleObject).get(seria).toString(), newListOfOrderColumnItems);
+				ArrayList<JSONObject> newListOfOrderColumnItems = map.get(newCol);
+				if (newListOfOrderColumnItems == null) {
+					newListOfOrderColumnItems = new ArrayList<JSONObject>();
+					for (int i = 0; i < categoriesList.length; i++) {
+						Object category = categoriesList[i];
+						JSONObject jo = new JSONObject();
+						jo.put("name", category);
+						jo.put("y", "");
+						newListOfOrderColumnItems.add(jo);
+					}
+					map.put(newCol, newListOfOrderColumnItems);
+				}
+
+				JSONObject jo = newListOfOrderColumnItems.get(categoriesListIndexMap.get(((Map) singleObject).get(primCat)));
+				jo.put("y", serieValue);
+
 			}
 
-			JSONObject jo = newListOfOrderColumnItems.get(categoriesListIndexMap.get(((Map) singleObject).get(primCat)));
-			jo.put("y", ((Map) singleObject).get(secCat));
 		}
 
+		logger.debug("map: " + map);
 		return map;
 
 	}
@@ -880,7 +919,7 @@ public class DataSetTransformer {
 				xAxis.put("type", "category");
 				id++;
 			}
-			xAxis.put("name", category.get("name").replaceAll("\\s", ""));
+			xAxis.put("name", category.get("name"));
 			xAxisMap.add(xAxis);
 			for (int i = 0; i < gbys.length; i++) {
 				if (!gbys[i].equals("")) {
@@ -893,7 +932,7 @@ public class DataSetTransformer {
 						xAxis1.put("type", "category");
 						id++;
 					}
-					xAxis1.put("name", gbys[i].replaceAll("\\s", ""));
+					xAxis1.put("name", gbys[i]);
 					xAxisMap.add(xAxis1);
 				}
 

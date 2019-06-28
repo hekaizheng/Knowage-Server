@@ -20,6 +20,7 @@
   'components/listDetail',
   'components/login',
   'components/lov',
+  'components/news',
   'components/templatemanagement',
   'components/documentBrowser',
   'components/documentExecution',
@@ -61,5 +62,7 @@
   @import 
   'vendors/aggrid',
   'vendors/angularMaterial',
-  'vendors/codeMirror';
+  'vendors/codeMirror',
+  'vendors/highcharts',
+  'vendors/ngWysiwyg';
 

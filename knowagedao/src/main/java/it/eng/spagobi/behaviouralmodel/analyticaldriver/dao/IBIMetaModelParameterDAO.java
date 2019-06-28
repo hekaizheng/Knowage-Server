@@ -3,6 +3,7 @@ package it.eng.spagobi.behaviouralmodel.analyticaldriver.dao;
 import java.util.List;
 
 import org.hibernate.HibernateException;
+import org.hibernate.Session;
 
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.BIMetaModelParameter;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.metadata.SbiMetaModelParameter;
@@ -25,6 +26,8 @@ public interface IBIMetaModelParameterDAO extends ISpagoBIDao {
 
 	public void eraseBIMetaModelParametersByMetaModelId(Integer MetaModelId);
 
-	public SbiParameters getParameterByDriverName(String name);
+	public SbiParameters getParameterByModelAndDriverName(String modelName, String name);
+
+	public void eraseBIMetaModelParameterDependencies(BIMetaModelParameter aBIMetaModelParameter, Session aSession);
 
 }

@@ -29,6 +29,8 @@
 			implementation="it.eng.spagobi.analiticalmodel.document.dao.SubreportDAOHibImpl" />
 		<DAO name="ViewpointDAO"
 			implementation="it.eng.spagobi.analiticalmodel.document.dao.ViewpointDAOHimpl" />
+		<DAO name="MetaModelViewpointDAO"
+			implementation="it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.MetaModelViewpointDAOHibImpl" />
 		<DAO name="DataSourceDAO"
 			implementation="it.eng.spagobi.tools.datasource.dao.DataSourceDAOHibImpl" />
 		<DAO name="DataSetDAO" implementation="it.eng.spagobi.tools.dataset.dao.DataSetDAOImpl" />
@@ -115,7 +117,7 @@
 		<DAO name="ISbiJobTableDAO" implementation="it.eng.spagobi.metadata.dao.SbiJobTableDAOHibImpl"/>
 		<DAO name="ISbiObjDsDAO" implementation="it.eng.spagobi.metadata.dao.SbiObjDsDAOHibImpl"/>
 		<DAO name="ISbiTableBcDAO" implementation="it.eng.spagobi.metadata.dao.SbiTableBcDAOHibImpl"/>
-		<DAO name="BIMetaModelParameterDAO" implementation="it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.BIMetaModelDAOHibImpl"/>
+		<DAO name="BIMetaModelParameterDAO" implementation="it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.BIMetaModelParameterDAOHibImpl"/>
 		<DAO name="MetaModelParuseDAO" implementation="it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.MetaModelParuseDAOHibImpl"/>
      	<DAO name="MetaModelParviewDAO" implementation="it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.MetaModelParviewDAOHibImpl"/>
 	</DAO-CONF>

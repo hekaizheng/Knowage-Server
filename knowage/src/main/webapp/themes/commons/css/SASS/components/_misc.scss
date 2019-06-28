@@ -1,3 +1,7 @@
+* {
+  box-sizing: border-box;
+}
+
 html{
   height: 100%; 
   font-size: $rootFontSize;
@@ -24,6 +28,10 @@ html{
   padding: 0;
 }
 
+.small-padding {
+  padding: 8px;
+}
+
 .margin-right10 {
   margin-right: 10px;
 }
@@ -41,12 +49,12 @@ md-toolbar.md-knowage-theme {
         outline: none;
         z-index: 10;
 		height: $toolbarHeight;
-		background-color: $headerBackground !important;
+		background-color: $headerBackground;
 		color: $lightTextColor !important;
 		.md-toolbar-tools {
 			height: $toolbarHeight;
 			font-size: $headerFontSize;
-			text-transform: uppercase;
+			text-transform: none;
 			font-weight: $headerFontWeight;
       button:not(.md-fab){
         min-height: $toolbarHeight;
@@ -64,6 +72,12 @@ md-toolbar.md-knowage-theme {
         }
       }
 		}
+    &._md-toolbar-transitions{
+      transition: none;
+    }
+    &:not(.md-menu-toolbar){
+      background-color: $baseColor;
+    }
 }
 
 md-list-item ._md-list-item-inner ._md-secondary-container, md-list-item ._md-secondary-container {
@@ -368,6 +382,29 @@ md-datepicker.kn-custom-datepicker {
     position: relative;
     text-transform: uppercase;
     font-size: $smallFontSize;
+    p {
+      margin: 0;
+    }
+    &.no-uppercase {
+      text-transform: none;
+    }
+}
+
+.kn-warning {
+    margin: 8px !important;
+    border: 1px solid rgba(#FBC02D,.5);
+    padding: 8px;
+    background-color: lighten(#FBC02D, 35%);
+    text-align: center;
+    position: relative;
+    text-transform: uppercase;
+    font-size: $smallFontSize;
+    p {
+      margin: 0;
+    }
+    &.no-uppercase {
+      text-transform: none;
+    }
 }
 
 .kn-close-Info {
@@ -458,6 +495,25 @@ md-icon {
   }
 }
 
+.text-transform-none {
+  text-transform: none;
+}
+.switchSubheader.md-subheader {
+  ._md-subheader-inner {
+    width: 100%;
+    padding: 8px 16px;
+    ._md-subheader-content {
+      width: 100%;
+      display: inline-flex;
+      justify-content: flex-start;
+      align-items: center;
+        md-switch {
+          margin: 0;
+        }
+    }
+  }
+}
+
 .noBorder{
 	border:0px;
 }
@@ -522,7 +578,7 @@ width:100%;
 }
 
 md-tab-content > div {
-height:100%;
+height:100% !important;
 }
 
 .rightHeight {
@@ -833,6 +889,13 @@ md-tab-item {
   border-color: red;
 }
 
+.kn-error-popup {
+  min-width: 300px; 
+  max-height: 400px; 
+  max-width: 600px; 
+  padding: 1px;
+}
+
 .kn-inputError {
   color: $negativeColor !important;
   border-bottom-color: $negativeColor !important;
@@ -846,6 +909,10 @@ md-tab-item {
         -ms-user-select: none; /* Internet Explorer/Edge */
             user-select: none; /* Non-prefixed version, currently
                                   supported by Chrome and Opera */
+}
+
+.notAllowedCursor {
+  cursor: not-allowed !important;
 }
 
 .knowageStandardTable {
@@ -962,6 +1029,14 @@ color-picker {
   }
 }
 
+.md-icon-button.md-knowage-theme {
+  &.md-secondary:not([disabled]) {
+    &:hover {
+      background-color: $ternaryColor;
+    }
+  }
+}
+
 .kn-select {
   border-bottom: 1px solid $bordersColor; 
   width: 100%; 
@@ -993,6 +1068,43 @@ color-picker {
   }
 }
 
+.kn-main-body {
+  ._md-open-menu-container {
+    z-index: 9999;
+  }
+  ._md-menu-backdrop {
+    z-index: 9998;
+  }
+}
+
+md-dialog {
+  background: $tabBackground;
+}
+filter-by-tags {
+  .inverse-flex {
+    flex-direction: row-reverse;
+  }
+  .kn-chip {
+    padding: 4px 8px;
+    background-color: $ternaryColor;
+    cursor: pointer;
+    margin-right: 4px;
+    line-height: 30px;
+    border-radius: 50px;
+    font-size: $mediumFontSize;
+    outline: none;
+    &:hover {
+      background-color: lighten($ternaryColor, 10%);
+    }
+    &.tagSelected {
+      background-color: $baseColor;
+      color: $lightTextColor;
+      
+    }
+  }
+}
+
+
 @supports (-ms-ime-align: auto) {
   .kn-list-detail {
     overflow-y: hidden;
@@ -1005,6 +1117,9 @@ color-picker {
 /* IE11 fix */
 
 @media all and (-ms-high-contrast: none), (-ms-high-contrast: active) {
+  .canvas-for-highcharts{
+    display: none;
+  }
   html{
     overflow: hidden;
   }

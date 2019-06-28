@@ -17,7 +17,7 @@
  */
 package it.eng.spagobi.tools.catalogue.metadata;
 
-import java.util.List;
+import java.util.Set;
 
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.metadata.SbiMetaModelParameter;
 import it.eng.spagobi.commons.metadata.SbiHibernateModel;
@@ -41,7 +41,7 @@ public class SbiMetaModel extends SbiHibernateModel {
 
 	private String modelLocker;
 
-	private List<SbiMetaModelParameter> biMetaModelParameters = null;
+	private Set<SbiMetaModelParameter> biMetaModelParameters = null;
 	// Constructors
 
 	public SbiMetaModel() {
@@ -89,8 +89,7 @@ public class SbiMetaModel extends SbiHibernateModel {
 	}
 
 	/**
-	 * @param category
-	 *            the category to set
+	 * @param category the category to set
 	 */
 	public void setCategory(Integer category) {
 		this.category = category;
@@ -112,8 +111,7 @@ public class SbiMetaModel extends SbiHibernateModel {
 	}
 
 	/**
-	 * @param modelLocked
-	 *            the modelLocked to set
+	 * @param modelLocked the modelLocked to set
 	 */
 	public void setModelLocked(Boolean modelLocked) {
 		this.modelLocked = modelLocked;
@@ -127,23 +125,18 @@ public class SbiMetaModel extends SbiHibernateModel {
 	}
 
 	/**
-	 * @param modelLocker
-	 *            the modelLocker to set
+	 * @param modelLocker the modelLocker to set
 	 */
 	public void setModelLocker(String modelLocker) {
 		this.modelLocker = modelLocker;
 	}
 
-	public List<SbiMetaModelParameter> getSbiMetaModelParameters() {
-		return biMetaModelParameters;
+	public Set<SbiMetaModelParameter> getSbiMetaModelParameters() {
+		return this.biMetaModelParameters;
 	}
 
-	public void setBiMetaModelParameters(List<SbiMetaModelParameter> biMetaModelParameters) {
-		this.biMetaModelParameters = biMetaModelParameters;
-	}
-
-	public List<SbiMetaModelParameter> getBiMetaModelParameters() {
-		return biMetaModelParameters;
+	public void setSbiMetaModelParameters(Set<SbiMetaModelParameter> sbiMetaModelParameters) {
+		this.biMetaModelParameters = sbiMetaModelParameters;
 	}
 
 }

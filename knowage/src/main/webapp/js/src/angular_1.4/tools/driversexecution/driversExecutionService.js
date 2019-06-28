@@ -1,11 +1,22 @@
 
 (function() {
 	angular.module('driversExecutionModule')
-		.service('driversExecutionService',['sbiModule_translate', 'driversDependencyService',function(sbiModule_translate, driversDependencyService){
+		.service('driversExecutionService',['sbiModule_translate', 'sbiModule_config', '$filter',function(sbiModule_translate, sbiModule_config, $filter){
 			var executionService = {}
 			executionService.jsonDatum =  {};
 			executionService.jsonDatumValue = null;
 			executionService.jsonDatumDesc = null;
+
+			executionService.gvpCtrlViewpoints = [];
+
+			executionService.emptyViewpoint = {
+						NAME : "",
+						DESCRIPTION: "",
+						SCOPE : "",
+						OBJECT_LABEL : "",
+						ROLE :"",
+						VIEWPOINT : JSON.parse("{}")
+			};
 
 			var isParameterSelectionValueLov = function(parameter) {return  parameter.valueSelection.toLowerCase() == 'lov'};
 			var isParameterSelectionTypeTree = function(parameter) {return parameter.selectionType.toLowerCase() == 'tree'};
@@ -17,7 +28,7 @@
 
 			executionService.buildStringParameters = function (documentParameters) {
 
-				if(documentParameters.length > 0) {
+				if(documentParameters && documentParameters.length > 0) {
 					for(var i = 0; i < documentParameters.length; i++ ) {
 						var parameter = documentParameters[i];
 						var valueKey = parameter.urlName;
@@ -155,15 +166,38 @@
 				return result;
 			};
 
-			executionService.buildCorrelation = function(parameters, execProperties){
-				driversDependencyService.buildVisualCorrelationMap(parameters,execProperties);
-				driversDependencyService.buildDataDependenciesMap(parameters,execProperties);
-				driversDependencyService.buildLovCorrelationMap(parameters,execProperties);
-				//INIT VISUAL CORRELATION PARAMS
-				for(var i=0; i<parameters.length; i++){
-					driversDependencyService.updateVisualDependency(parameters[i],execProperties);
+			executionService.showFilterIcon = false;
+
+			executionService.hasMandatoryDrivers = function(drivers){
+				var showSideBar = false;
+				if(drivers && drivers.length > 0){
+					for(var i = 0; i < drivers.length; i++){
+						if(drivers[i].mandatory){
+							if(drivers[i].defaultValues && drivers[i].defaultValues.length == 1 && drivers[i].defaultValues[0].isEnabled){
+								showSideBar = false;
+								executionService.showFilterIcon = false;
+							} else {
+								showSideBar = true;
+								executionService.showFilterIcon = true;
+							}
+						} else {
+							showSideBar = false;
+							executionService.showFilterIcon = true;
+						}
+					}
 				}
+				return showSideBar;
 			};
+
+			executionService.createObjectFromArray = function(drivers){
+				var returnObject = {}
+				for(var i = 0; i < drivers.length; i++){
+					var driverName = Object.keys(drivers[i]);
+					var driverValue = drivers[i][Object.keys(drivers[i])[0]];
+					returnObject[driverName] = driverValue;
+				}
+				return returnObject
+			}
 
 			var resetWithoutDefaultValues = function(parameter){
 
@@ -242,7 +276,7 @@
 			var parseParameterListOrComboxSelectionType = function(parameter){
 				if(parameter.multivalue) {
 					parameter.parameterValue = parameter.parameterValue || [];
-					jsonDatumValue = parameter.parameterValue;
+					executionService.jsonDatumValue = parameter.parameterValue;
 					// set descritpion
 					if(parameter.parameterDescription){
 						// if already in the form ; ;
@@ -270,7 +304,7 @@
 							executionService.jsonDatumDesc = desc;
 						}
 					}else{
-						executionService.jsonDatumDesc = jsonDatumValue.join(";");
+						executionService.jsonDatumDesc = executionService.jsonDatumValue.join(";");
 					}
 
 				} else {
@@ -359,6 +393,29 @@
 				}
 			};
 
+			executionService.prepareDriversForSending = function(drivers){
+
+				var transformedDrivers = {};
+					if(drivers){
+						for(var i = 0; i < drivers.length; i++){
+								var tempDriver = {}
+								tempDriver.urlName = drivers[i].urlName;
+								tempDriver.type = drivers[i].type;
+								tempDriver.multivalue = drivers[i].multivalue;
+								if(drivers[i].parameterValue && Array.isArray(drivers[i].parameterValue)){
+									tempDriver.value = [];
+									for(var j = 0; j < drivers[i].parameterValue.length; j++) {
+										tempDriver.value.push(drivers[i].parameterValue[j])
+									}
+								}else{
+									tempDriver.value = drivers[i].parameterValue;
+								}
+								transformedDrivers[tempDriver.urlName] = tempDriver;
+
+						}
+					}
+				return transformedDrivers;
+			}
   return executionService;
 
 		}])

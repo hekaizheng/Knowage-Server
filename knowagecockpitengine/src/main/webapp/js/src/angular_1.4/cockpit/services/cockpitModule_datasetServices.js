@@ -6,6 +6,20 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 	this.datasetMapByLabel={};
 
 	this.infoColumns = [];
+	this.datasetTypes = {
+			"SbiQueryDataSet": sbiModule_translate.load('kn.cockpit.dataset.type.query'),
+			"SbiCkanDataSet": sbiModule_translate.load('kn.cockpit.dataset.type.ckan'),
+			"SbiCustomDataSet": sbiModule_translate.load('kn.cockpit.dataset.type.custom'),
+			"SbiFileDataSet": sbiModule_translate.load('kn.cockpit.dataset.type.file'),
+			"SbiFlatDataSet": sbiModule_translate.load('kn.cockpit.dataset.type.flat'),
+			"SbiJClassDataSet": sbiModule_translate.load('kn.cockpit.dataset.type.jclass'),
+			"SbiScriptDataSet": sbiModule_translate.load('kn.cockpit.dataset.type.script'),
+			"SbiFederatedDataSet": sbiModule_translate.load('kn.cockpit.dataset.type.federated'),
+			"SbiQbeDataSet": sbiModule_translate.load('kn.cockpit.dataset.type.qbe'),
+			"SbiSolrDataSet": sbiModule_translate.load('kn.cockpit.dataset.type.solr'),
+			"SbiSPARQLDataSet": sbiModule_translate.load('kn.cockpit.dataset.type.sparql'),
+			"SbiRESTDataSet": sbiModule_translate.load('kn.cockpit.dataset.type.rest')
+	}
 
 	this.isDatasetFromTemplateLoaded = false;
 
@@ -20,9 +34,9 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 				angular.forEach(cockpitModule_template.configuration.datasets, function(item){
 					this.push(item.dsId);
 				}, dsIds);
-
+				
 				sbiModule_restServices.restToRootProject();
-				sbiModule_restServices.promiseGet("2.0/datasets", "", "asPagedList=true&seeTechnical=" + (sbiModule_user.isTechnicalUser ? "TRUE" : "FALSE") + "&ids=" + dsIds.join())
+				sbiModule_restServices.promiseGet("2.0/datasets", "", "asPagedList=true&seeTechnical=true&ids=" + dsIds.join())
 				.then(function(response){
 					for(var i in response.data.item){
 						var dataset = response.data.item[i];
@@ -54,9 +68,10 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 
 	this.loadDatasetList=function(){
 		var def=$q.defer();
-		if(!ds.isDatasetListLoaded){
-			sbiModule_restServices.restToRootProject();
-			sbiModule_restServices.promiseGet("2.0/datasets", "", "asPagedList=true&seeTechnical=" + (sbiModule_user.isTechnicalUser ? "TRUE" : "FALSE"))
+		if(!ds.isDatasetListLoaded){			
+			// --- sbiModule_user.isTechnicalUser returning "true" or "false" as STRING --- //			
+			sbiModule_restServices.restToRootProject();						
+			sbiModule_restServices.promiseGet("2.0/datasets", "", "asPagedList=true&seeTechnical=" + sbiModule_user.isTechnicalUser)
 			.then(function(response){
 				var allDatasets = response.data.item;
 
@@ -148,6 +163,14 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 			return null;
 		}
 	}
+
+	this.getDatasetLabelsByIds=function(dsIds){
+	    dsLabels = [];
+	    for(var i in dsIds){
+	        dsLabels.push(ds.getDatasetLabelById(dsIds[i]));
+	    }
+        return dsLabels;
+    }
 
 	this.checkForDSChange=function(){
 		var changed=[];
@@ -500,10 +523,27 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 				if(angular.equals(cockpitModule_template.configuration.datasets[i].dsId,dsId)){
 					angular.forEach(cockpitModule_template.configuration.datasets[i].parameters,function(item,key){
 							this[key]=[cockpitModule_utilstServices.getParameterValue(item)];
-					},params)
+							if (item == undefined) {
+								
+								var datasetFound=ds.getDatasetById(dsId);
+								var paramsFound = datasetFound.parameters;
+								for (var j = 0; j < paramsFound.length; j++) {
+									
+									if((paramsFound[j].name == key) && paramsFound[j].defaultValue != undefined) {
+										this[key] = paramsFound[j].defaultValue;
+										cockpitModule_template.configuration.datasets[i].parameters[key] = this[key] ;
+									}
+									
+								}
+								
+							}
+					},params);
+					
+					
 				}
 			}
 
+			
 			var datasetLabel=ds.getDatasetById(dsId).label;
 			var selections=cockpitModule_widgetSelection.getCurrentSelections(datasetLabel);
 			if(selections!=undefined && selections.hasOwnProperty(datasetLabel)){
@@ -539,9 +579,12 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 		}
 		return params;
 	}
-
+	var savedFilters = null;
+	this.getFiltersWithoutParams=function(){
+		return savedFilters;
+	}
 	//TODO missing maxRows
-	this.loadDatasetRecordsById = function(dsId, page, itemPerPage,columnOrdering, reverseOrdering, ngModel, loadDomainValues){
+	this.loadDatasetRecordsById = function(dsId, page, itemPerPage,columnOrdering, reverseOrdering, ngModel, loadDomainValues, nature){
 
 		if(loadDomainValues == undefined){
 			loadDomainValues = false;
@@ -695,103 +738,17 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 			params+="&nearRealtime=true";
 		}
 
-		var filtersToSend = {};
-		if(!loadDomainValues && ngModel.updateble){
-			filtersToSend = angular.copy(cockpitModule_widgetSelection.getCurrentSelections(dataset.label));
-			var filters = angular.copy(cockpitModule_widgetSelection.getCurrentFilters(dataset.label));
-			angular.merge(filtersToSend, filters);
-		}
-		if(ngModel.type=="selector"){
-			var datasetLabel = ngModel.dataset.label;
-			if(loadDomainValues==false && filtersToSend[datasetLabel]){
-				delete filtersToSend[datasetLabel][ngModel.content.selectedColumn.name];
-			}
-		}
-
 		var limitRows;
-		if(ngModel.limitRows){
-			limitRows = ngModel.limitRows;
-		}else if(ngModel.content && ngModel.content.limitRows){
-			limitRows = ngModel.content.limitRows;
-		}
-		if(limitRows != undefined && limitRows.enable && limitRows.rows > 0){
-			params += "&limit=" + limitRows.rows;
-		}
+        if(ngModel.limitRows){
+            limitRows = ngModel.limitRows;
+        }else if(ngModel.content && ngModel.content.limitRows){
+            limitRows = ngModel.content.limitRows;
+        }
+        if(limitRows != undefined && limitRows.enable && limitRows.rows > 0){
+            params += "&limit=" + limitRows.rows;
+        }
 		
-		var filters;
-		if(ngModel.filters){
-			filters = ngModel.filters;
-		}else if(ngModel.content && ngModel.content.filters){
-			filters = ngModel.content.filters;
-		}
-		if(filters){
-			for(var i=0;i<filters.length;i++){
-
-				var filterElement=filters[i];
-
-				// if filter.dataset is not defined means filter coming from old interface and then set it to current dataset
-				if(filterElement.dataset == undefined){
-					filterElement.dataset = dataset.label;
-				}
-
-				// if filter.dataset is defined check dataset is current one
-				if(filterElement.dataset != undefined && filterElement.dataset == dataset.label){
-
-					var colName=filterElement.colName;
-					var type=filterElement.type;
-
-					var filterOperator;
-					if(filterElement.filterOperator != undefined){
-						filterOperator=filterElement.filterOperator;
-					}
-					else {
-						if(filterElement.filterVals && filterElement.filterVals.length>0){
-							filterOperator = "=";
-						}
-						else{
-							filterOperator = "";
-						}
-
-					}
-
-					// if type is undefined get it from metadata
-					if(type == undefined){
-						var found = false;
-						for(var j=0; j<dataset.metadata.fieldsMeta.length && !found; j++){
-							var metaElement=dataset.metadata.fieldsMeta[j];
-							if(metaElement.name == colName){
-								filterElement.type = metaElement.type;
-								found = true;
-							}
-						}
-					}
-
-					var filterVals=filterElement.filterVals;
-					if(filterOperator != ""){
-						var values=[];
-						// if filterOperator is IN and filterVals has "," then filterVals must be splitted
-						if(filterOperator == "IN" && filterVals[0] && filterVals[0].includes(",") ){
-							filterVals = filterVals[0].split(",");
-						}
-						angular.forEach(filterVals, function(item){
-							this.push("('" + item + "')");
-						}, values);
-
-						var filter = { filterOperator: filterOperator, filterVals: values};
-
-						if(!filtersToSend[dataset.label]){
-							filtersToSend[dataset.label] = {};
-						}
-
-						if(!filtersToSend[dataset.label][colName]){
-							filtersToSend[dataset.label][colName] = filter;
-						}else{
-							filtersToSend[dataset.label][colName].push(filter);
-						}
-					}
-				}
-			}
-		}
+		var filtersToSendWithoutParams = ds.getWidgetSelectionsAndFilters(ngModel, dataset, loadDomainValues);
 
 		if(ngModel.search
 				&& ngModel.search.text && ngModel.search.text!=""
@@ -803,22 +760,12 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 			likeSelections[dataset.label] = searchData;
 			bodyString = bodyString + ",likeSelections:" + JSON.stringify(likeSelections);
 		}
-
-		var filtersToSendWithoutParams = {};
-															
-		angular.copy(filtersToSend,filtersToSendWithoutParams);
-		angular.forEach(filtersToSendWithoutParams, function(item){
-			var paramsToDelete = [];
-			for (var property in item) {
-				if (item.hasOwnProperty(property) && property.startsWith("$P{") && property.endsWith("}")) {
-					paramsToDelete.push(property);
-				}
-			}
-			angular.forEach(paramsToDelete, function(prop){
-				delete item[prop];
-			});
-		});
    
+		savedFilters = filtersToSendWithoutParams;
+
+		if(dataset.type == "SbiSolrDataSet" && ngModel.type != "discovery"){
+            bodyString = bodyString + ",options:{solrFacetPivot:true}";
+        }
 
 		bodyString = bodyString + ",selections:" + JSON.stringify(filtersToSendWithoutParams) + "}";
 
@@ -878,6 +825,138 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 		}
 	}
 
+	// Returns Selections with Filters for Single Widget
+	this.getWidgetSelectionsAndFilters = function(widgetObject, dataset, loadDomainValues) {
+		var filtersToSend = {};
+		var datasetLabel = dataset.label;
+		if(loadDomainValues == undefined){
+			loadDomainValues = false;
+		}
+
+		if(!loadDomainValues && widgetObject.updateble){
+			filtersToSend = angular.copy(cockpitModule_widgetSelection.getCurrentSelections(datasetLabel));
+			var filters = angular.copy(cockpitModule_widgetSelection.getCurrentFilters(datasetLabel));
+			angular.merge(filtersToSend, filters);
+
+            if(widgetObject.type=="selector"){
+                var isColumnInAssociation = false;
+                for(var i=0; !isColumnInAssociation && i<cockpitModule_template.configuration.aggregations.length; i++){
+                    var aggregation = cockpitModule_template.configuration.aggregations[i];
+                    for(var j=0; !isColumnInAssociation && j<aggregation.associations.length; j++){
+                        var association = aggregation.associations[j];
+                        for(var k=0; !isColumnInAssociation && k<association.fields.length; k++){
+                            var field = association.fields[k];
+                            if(field.type=="dataset" && field.store==datasetLabel && field.column==widgetObject.content.selectedColumn.name){
+                                isColumnInAssociation = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if(!isColumnInAssociation){
+                    if(widgetObject.dataset && widgetObject.dataset.label && filtersToSend[widgetObject.dataset.label]
+                            && widgetObject.content && widgetObject.content.selectedColumn && widgetObject.content.selectedColumn.name
+                            && filtersToSend[widgetObject.dataset.label][widgetObject.content.selectedColumn.name]){
+                        delete filtersToSend[widgetObject.dataset.label][widgetObject.content.selectedColumn.name];
+                    }
+                }
+            }
+		}
+
+		var filters;
+		if(widgetObject.filters){
+			filters = widgetObject.filters;
+		}else if(widgetObject.content && widgetObject.content.filters){
+			filters = widgetObject.content.filters;
+		}
+		if(filters){
+			for(var i=0;i<filters.length;i++){
+
+				var filterElement=filters[i];
+
+				// if filter.dataset is not defined means filter coming from old interface and then set it to current dataset
+				if(filterElement.dataset == undefined){
+					filterElement.dataset = datasetLabel;
+				}
+
+				// if filter.dataset is defined check dataset is current one
+				if(filterElement.dataset != undefined && filterElement.dataset == datasetLabel){
+
+					var colName=filterElement.colName;
+					var type=filterElement.type;
+
+					var filterOperator;
+					if(filterElement.filterOperator != undefined){
+						filterOperator=filterElement.filterOperator;
+					}
+					else {
+						if(filterElement.filterVals && filterElement.filterVals.length>0){
+							filterOperator = "=";
+						}
+						else{
+							filterOperator = "";
+						}
+
+					}
+
+					// if type is undefined get it from metadata
+					if(type == undefined){
+						var found = false;
+						for(var j=0; j<dataset.metadata.fieldsMeta.length && !found; j++){
+							var metaElement=dataset.metadata.fieldsMeta[j];
+							if(metaElement.name == colName){
+								filterElement.type = metaElement.type;
+								found = true;
+							}
+						}
+					}
+
+					var filterVals=filterElement.filterVals;
+					if(filterOperator != ""){
+						var values=[];
+						// if filterOperator is IN and filterVals has "," then filterVals must be splitted
+						if(filterOperator == "IN" && filterVals[0] && filterVals[0].includes(",") ){
+							filterVals = filterVals[0].split(",");
+						}
+						angular.forEach(filterVals, function(item){
+							this.push("('" + item + "')");
+						}, values);
+
+						var filter = { filterOperator: filterOperator, filterVals: values};
+
+						if(!filtersToSend[datasetLabel]){
+							filtersToSend[datasetLabel] = {};
+						}
+
+						if(!filtersToSend[datasetLabel][colName]){
+							filtersToSend[datasetLabel][colName] = filter;
+						}else{
+							filtersToSend[datasetLabel][colName].push(filter);
+						}
+					}
+				}
+			}
+		}
+		
+		var filtersToSendWithoutParams = {};
+		
+		angular.copy(filtersToSend, filtersToSendWithoutParams);
+		angular.forEach(filtersToSendWithoutParams, function(item){
+			var paramsToDelete = [];
+			for (var property in item) {
+				if (item.hasOwnProperty(property) && property.startsWith("$P{") && property.endsWith("}")) {
+					paramsToDelete.push(property);
+				}
+			}
+			angular.forEach(paramsToDelete, function(prop){
+				delete item[prop];
+			});
+		});
+		
+		return filtersToSendWithoutParams;
+	}
+
 	this.getParametersAsString = function(parameters){
 		var delim = "";
 		var output = "{";
@@ -931,11 +1010,11 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 			for(var i=0;i<columns.length;i++){
 				var col = columns[i];
 
-				if(col.fieldType!="ATTRIBUTE"){
+				if(col.fieldType!="ATTRIBUTE" && col.aggregationSelected != undefined  && col.aggregationSelected != "NONE"){  // if col.aggregationSelected == undefined or "NONE" : continue oppure obj["funct"] col.aggregationSelected 
 					var obj = {};
 					obj["id"] = col.name;
 					obj["alias"] = ngModel.type == "table" ? col.aliasToShow : col.alias;
-					obj["funct"] = col.funcSummary == undefined? "" : col.funcSummary;
+					obj["funct"] = col.aggregationSelected;  //col.funcSummary
 					obj["columnName"] = ngModel.type == "table" ? col.name : col.alias;
 
 					measures.push(obj);
@@ -950,7 +1029,7 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 
 	}
 
-	this.addDataset=function(attachToElementWithId,container,multiple,autoAdd,typeAvailable,typeExclusion){
+	this.addDataset=function(attachToElementWithId,container,multiple,autoAdd,typeAvailable,typeExclusion,skipParameters){
 		var deferred = $q.defer();
 		var eleToAtt=document.body;
 		if(attachToElementWithId!=undefined){
@@ -962,6 +1041,13 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 				locals :{currentAvaiableDataset:container,multiple:multiple,deferred:deferred},
 				controller: function($scope,mdPanelRef,sbiModule_translate,cockpitModule_datasetServices,currentAvaiableDataset,multiple,deferred,$mdDialog){
 
+					$scope.translate = sbiModule_translate;
+					$scope.datasetSearchText = '';
+					$scope.filterDataset = function(){
+						var tempDatasetList = $filter('filter')($scope.datasetList,$scope.datasetSearchText);
+						$scope.cockpitDatasetGrid.api.setRowData(tempDatasetList);
+					}
+					
 					$scope.tmpCurrentAvaiableDataset;
 					if(multiple){
 						tmpCurrentAvaiableDataset=[];
@@ -971,7 +1057,48 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 
 					$scope.multiple=multiple;
 
-					$scope.cockpitDatasetColumn=[{label:"Label",name:"label"},{label:"Name",name:"name" } ];
+					$scope.cockpitDatasetColumn = [
+						{"headerName": sbiModule_translate.load('kn.cockpit.dataset.label'),"field":"label",headerCheckboxSelection: multiple, checkboxSelection: multiple},
+						{"headerName": sbiModule_translate.load('kn.cockpit.dataset.name'),"field":"name"},
+						{"headerName": sbiModule_translate.load('kn.cockpit.dataset.type'),"field":"type",cellRenderer:typeRenderer,width: 250,suppressSizeToFit:true,suppressMovable:true},
+						{"headerName": "tags","field":"Tags", cellRenderer:tagsRenderer},
+						{"headerName": sbiModule_translate.load('kn.cockpit.dataset.hasParameters'),"field":"parameters","cellStyle":
+							{"display":"inline-flex","justify-content":"center", "align-items": "center"},cellRenderer:hasParametersRenderer,suppressSorting:true,suppressFilter:true,width: 150,suppressSizeToFit:true,suppressMovable:true}];
+
+					$scope.cockpitDatasetGrid = {
+					        enableColResize: false,
+					        enableFilter: true,
+					        enableSorting: true,
+					        pagination: true,
+					        paginationAutoPageSize: true,
+					        rowSelection: multiple ? 'multiple' : 'single',
+					        rowMultiSelectWithClick: multiple,
+					        onGridSizeChanged: resizeColumns,
+					        columnDefs : $scope.cockpitDatasetColumn
+					};
+
+					function resizeColumns(){
+						$scope.cockpitDatasetGrid.api.sizeColumnsToFit();
+					}
+
+					function hasParametersRenderer(params){
+						return (params.value.length > 0) ? '<i class="fa fa-check"></i>' : '';
+					}
+					
+					function typeRenderer(params){
+						return cockpitModule_datasetServices.datasetTypes[params.value] || sbiModule_translate.load('kn.cockpit.dataset.type.generic');
+					}
+					
+					function tagsRenderer(params){
+						debugger;
+						if(params.value && params.value.length > 0) {
+							var cell = '';
+							for(var i in params.value){
+								cell += '<span class="miniChip">'+params.value[i].name+'</span>';
+							}
+							return cell;
+						}
+					}
 
 					$scope.isDatasetListLoaded = false;
 
@@ -1030,6 +1157,7 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 						
 						$scope.datasetList = datasetList;
 						$scope.isDatasetListLoaded = true;
+						$scope.cockpitDatasetGrid.api.setRowData($scope.datasetList);
 					},function(response){
 						sbiModule_restServices.errorHandler(response.data,"");
 						def.reject();
@@ -1043,6 +1171,7 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 
 					$scope.saveDataset=function(){
 						if(multiple){
+							$scope.tmpCurrentAvaiableDataset = $scope.cockpitDatasetGrid.api.getSelectedRows();
 							for(var i=0;i<$scope.tmpCurrentAvaiableDataset.length;i++){
 								$scope.tmpCurrentAvaiableDataset[i].expanded = true;
 								if(autoAdd){
@@ -1057,7 +1186,8 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 							$scope.$destroy();
 
 						}else{
-							if($scope.tmpCurrentAvaiableDataset.parameters!=null && $scope.tmpCurrentAvaiableDataset.parameters.length>0){
+							$scope.tmpCurrentAvaiableDataset = $scope.cockpitDatasetGrid.api.getSelectedRows()[0];
+							if($scope.tmpCurrentAvaiableDataset.parameters!=null && $scope.tmpCurrentAvaiableDataset.parameters.length>0 && !skipParameters){
 								//fill the parameter
 
 								 $mdDialog.show({
@@ -1481,7 +1611,9 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 	 					if(colValue == undefined) colValue ='';
 
 	 					if(allDatasetRecords.metaData.fields[1].type == 'float' && model.numbers){
-	 						colValue = ds.formatValue(colValue,model.numbers);
+	 						if(model.numbers.format) colValue = $filter('number')(colValue,model.numbers.precision);
+	 						else colValue = model.numbers.precision ? parseFloat(colValue).toFixed(model.numbers.precision) : colValue;
+	 						colValue = (model.numbers.prefix || '') + colValue + (model.numbers.suffix || '');
 	 					}
 
 
@@ -1523,49 +1655,49 @@ angular.module("cockpitModule").service("cockpitModule_datasetServices",function
 	}
 
 	//conditional value formatting
-    ds.formatValue = function (value, numbersModel){
-		var output = value;
-		if(!numbersModel || !numbersModel.precision || numbersModel.precision < 0) numbersModel.precision = 2;
-
-		//setting the number precision when format is not present
-		if (numbersModel && numbersModel.precision && !numbersModel.format) {
-			output = parseFloat(value).toFixed(numbersModel.precision);
-		}
-
-		if (numbersModel && numbersModel.format){
-	    	switch (numbersModel.format) {
-	    	case "#.###":
-	    		output = ds.numberFormat(value, 0, ',', '.');
-	    	break;
-	    	case "#,###":
-	    		output = ds.numberFormat(value, 0, '.', ',');
-	    	break;
-	    	case "#.###,##":
-	    		output = ds.numberFormat(value, numbersModel.precision, ',', '.');
-	    	break;
-	    	case "#,###.##":
-	    		output = ds.numberFormat(value, numbersModel.precision, '.', ',');
-	    		break;
-	    	default:
-	    		break;
-	    	}
-		}
-    	return (numbersModel.prefix||'') + output + (numbersModel.suffix||'');
-	}
-
-    //formatting function with the given parameters
-	ds.numberFormat = function (value, dec, dsep, tsep) {
-
-		  if (isNaN(value) || value == null) return value;
-
-		  value = parseFloat(value).toFixed(~~dec);
-		  tsep = typeof tsep == 'string' ? tsep : ',';
-
-		  var parts = value.split('.'), fnums = parts[0],
-		    decimals = parts[1] ? (dsep || '.') + parts[1] : '';
-
-		  return fnums.replace(/(\d)(?=(?:\d{3})+$)/g, '$1' + tsep) + decimals;
-	}
+//    ds.formatValue = function (value, numbersModel){
+//		var output = value;
+//		if(!numbersModel || !numbersModel.precision || numbersModel.precision < 0) numbersModel.precision = 2;
+//
+//		//setting the number precision when format is not present
+//		if (numbersModel && numbersModel.precision && !numbersModel.format) {
+//			output = parseFloat(value).toFixed(numbersModel.precision);
+//		}
+//
+//		if (numbersModel && numbersModel.format){
+//	    	switch (numbersModel.format) {
+//	    	case "#.###":
+//	    		output = ds.numberFormat(value, 0, ',', '.');
+//	    	break;
+//	    	case "#,###":
+//	    		output = ds.numberFormat(value, 0, '.', ',');
+//	    	break;
+//	    	case "#.###,##":
+//	    		output = ds.numberFormat(value, numbersModel.precision, ',', '.');
+//	    	break;
+//	    	case "#,###.##":
+//	    		output = ds.numberFormat(value, numbersModel.precision, '.', ',');
+//	    		break;
+//	    	default:
+//	    		break;
+//	    	}
+//		}
+//    	return (numbersModel.prefix||'') + output + (numbersModel.suffix||'');
+//	}
+//
+//    //formatting function with the given parameters
+//	ds.numberFormat = function (value, dec, dsep, tsep) {
+//
+//		  if (isNaN(value) || value == null) return value;
+//
+//		  value = parseFloat(value).toFixed(~~dec);
+//		  tsep = typeof tsep == 'string' ? tsep : ',';
+//
+//		  var parts = value.split('.'), fnums = parts[0],
+//		    decimals = parts[1] ? (dsep || '.') + parts[1] : '';
+//
+//		  return fnums.replace(/(\d)(?=(?:\d{3})+$)/g, '$1' + tsep) + decimals;
+//	}
 
 })
 .run(function() {

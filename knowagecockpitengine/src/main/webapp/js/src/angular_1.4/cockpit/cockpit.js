@@ -15,7 +15,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
+var isIE = window.document.documentMode;
 var scripts = document.getElementsByTagName("script");
 var baseScriptPath  = scripts[scripts.length - 1].src;
 baseScriptPath =baseScriptPath .substring(0, baseScriptPath .lastIndexOf('/'));
@@ -32,23 +32,23 @@ var cockpitApp= angular.module("cockpitModule",[
 	'file_upload',
 	'ngWYSIWYG',
 	'angular_table',
-	'cockpit_angular_table',
 	'color.picker',
 	'dndLists',
 	'chartRendererModule',
-	'accessible_angular_table',
-	'cockpitTable',
 	'jsonFormatter',
 	'ui.codemirror',
 	'knModule',
 	'agGrid'
 	]);
-cockpitApp.config(['$mdThemingProvider','$mdGestureProvider','$compileProvider', function($mdThemingProvider,$mdGestureProvider,$compileProvider) {
+cockpitApp.config(function($mdThemingProvider,$mdGestureProvider,$compileProvider,$mdInkRippleProvider,$mdAriaProvider) {
     $mdThemingProvider.theme('knowage')
     $mdThemingProvider.setDefaultTheme('knowage');
     $mdGestureProvider.skipClickHijack();
-    $compileProvider.debugInfoEnabled(false);
-}]);
+    if(isIE){
+    	$mdInkRippleProvider.disableInkRipple();
+    	$mdAriaProvider.disableWarnings();
+    }
+});
 
 
 cockpitApp.controller("cockpitMasterControllerWrapper",
@@ -57,6 +57,7 @@ cockpitApp.controller("cockpitMasterControllerWrapper",
 		'sbiModule_i18n',
 		'cockpitModule_widgetServices',
 		'cockpitModule_template',
+		'cockpitModule_backwardCompatibility',
 		'cockpitModule_datasetServices',
 		'cockpitModule_documentServices',
 		'cockpitModule_crossServices',
@@ -75,6 +76,7 @@ function cockpitMasterControllerWrapper(
 		sbiModule_i18n,
 		cockpitModule_widgetServices,
 		cockpitModule_template,
+		cockpitModule_backwardCompatibility,
 		cockpitModule_datasetServices,
 		cockpitModule_documentServices,
 		cockpitModule_crossServices,
@@ -92,6 +94,7 @@ function cockpitMasterControllerWrapper(
         $scope: $scope, //passing the same scope on through
         cockpitModule_widgetServices: cockpitModule_widgetServices,
         cockpitModule_template: cockpitModule_template,
+        cockpitModule_backwardCompatibility: cockpitModule_backwardCompatibility,
 		cockpitModule_datasetServices: cockpitModule_datasetServices,
 		cockpitModule_documentServices: cockpitModule_documentServices,
 		cockpitModule_crossServices: cockpitModule_crossServices,
@@ -110,37 +113,41 @@ function cockpitMasterControllerWrapper(
 
 
 
-cockpitApp.controller("cockpitMasterController",['$scope','cockpitModule_widgetServices','cockpitModule_template','cockpitModule_datasetServices','cockpitModule_documentServices','cockpitModule_crossServices','cockpitModule_nearRealtimeServices','cockpitModule_realtimeServices','cockpitModule_properties','cockpitModule_templateServices','$rootScope','$q','sbiModule_device','accessibility_preferences',cockpitMasterControllerFunction]);
-function cockpitMasterControllerFunction($scope,cockpitModule_widgetServices,cockpitModule_template,cockpitModule_datasetServices,cockpitModule_documentServices,cockpitModule_crossServices,cockpitModule_nearRealtimeServices,cockpitModule_realtimeServices,cockpitModule_properties,cockpitModule_templateServices,$rootScope,$q,sbiModule_device,accessibility_preferences){
+cockpitApp.controller("cockpitMasterController",['$scope','cockpitModule_widgetServices','cockpitModule_template','cockpitModule_backwardCompatibility','cockpitModule_datasetServices','cockpitModule_documentServices','cockpitModule_crossServices','cockpitModule_nearRealtimeServices','cockpitModule_realtimeServices','cockpitModule_properties','cockpitModule_templateServices','$rootScope','$q','sbiModule_device','accessibility_preferences',cockpitMasterControllerFunction]);
+function cockpitMasterControllerFunction($scope,cockpitModule_widgetServices,cockpitModule_template,cockpitModule_backwardCompatibility,cockpitModule_datasetServices,cockpitModule_documentServices,cockpitModule_crossServices,cockpitModule_nearRealtimeServices,cockpitModule_realtimeServices,cockpitModule_properties,cockpitModule_templateServices,$rootScope,$q,sbiModule_device,accessibility_preferences){
 	$scope.cockpitModule_widgetServices=cockpitModule_widgetServices;
 	$scope.imageBackgroundUrl=cockpitModule_template.configuration.style.imageBackgroundUrl;
-	$scope.cockpitModule_template=cockpitModule_template;
+	cockpitModule_template = cockpitModule_backwardCompatibility.updateCockpitModel(cockpitModule_template);
 	$scope.sbiModule_device=sbiModule_device;
 
 	$scope.initializedSheets = [0]; // first sheet is always loaded
 
 	var initSheet = $scope.$watch('cockpitModule_properties.CURRENT_SHEET',function(newValue,oldValue){
-        if(newValue!=undefined && $scope.initializedSheets.indexOf(newValue) == -1){
-
-        	var currentSheet; // get sheet checking proper index
-        	for(var i=0; i < cockpitModule_template.sheets.length; i++){
-        		if(cockpitModule_template.sheets[i].index == newValue){
-        			currentSheet = cockpitModule_template.sheets[i];
-        			break;
-        		}
-        	}
-
-        	for(var i=0; i < currentSheet.widgets.length; i++){
-        		var widgetId = currentSheet.widgets[i].id;
-            	var tempElement = angular.element(document.querySelector('#w' + widgetId));
-            	$rootScope.$broadcast("WIDGET_EVENT" + widgetId, "INIT", {element:tempElement});
-        	}
-
-        	$scope.initializedSheets.push(newValue);
+        var currentSheet; // get sheet checking proper index
+        for(var i=0; i < cockpitModule_template.sheets.length; i++){
+            if(cockpitModule_template.sheets[i].index == newValue){
+                currentSheet = cockpitModule_template.sheets[i];
+                break;
+            }
         }
 
-        if($scope.initializedSheets.length == cockpitModule_template.sheets.length){
-        	initSheet();
+        if(currentSheet && currentSheet.widgets){
+            if(newValue!=undefined && $scope.initializedSheets.indexOf(newValue) == -1){
+                for(var i=0; i < currentSheet.widgets.length; i++){
+                    var widgetId = currentSheet.widgets[i].id;
+                    var tempElement = angular.element(document.querySelector('#w' + widgetId));
+                    $rootScope.$broadcast("WIDGET_EVENT" + widgetId, "INIT", {element:tempElement});
+                }
+                $scope.initializedSheets.push(newValue);
+            }else{
+                for(var i=0; i < currentSheet.widgets.length; i++){
+                    var widgetId = currentSheet.widgets[i].id;
+                    if(cockpitModule_properties.DIRTY_WIDGETS.indexOf(widgetId) > -1){
+                        var tempElement = angular.element(document.querySelector('#w' + widgetId));
+                        $rootScope.$broadcast("WIDGET_EVENT" + widgetId, "UPDATE_FROM_SHEET_CHANGE", {element:tempElement});
+                    }
+                }
+            }
         }
     })
 

@@ -15,23 +15,20 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-/**
- * @authors Giovanni Luca Ulivo (GiovanniLuca.Ulivo@eng.it)
- * v0.0.1
- * 
- */
 (function(){
 
 angular.module('cockpitModule').directive('datasetSelector',function($compile){
 	   return{
 		   templateUrl: baseScriptPath+ '/directives/commons/dataset-selector/templates/datasetSelector.html',
 		   transclude: true,
-		   replace: true,		  
+		   replace: true,
 		   scope:{
 			   ngModel:"=",
 			   extended:"=?",
+			   datasetSettings:"=?",
 			   onChange:"&",
+			   isDisabled:"=?",
+			   noParameters: "=?",
 			   datasetTypeAvailable:"=?",
 			   datasetTypeExclusion:"=?"
 		   },
@@ -40,24 +37,29 @@ angular.module('cockpitModule').directive('datasetSelector',function($compile){
                     pre: function preLink(scope, element, attrs, ctrl, transclud) {
                     },
                     post: function postLink(scope, element, attrs, ctrl, transclud) {
-                    	
+
                     }
                 };
 		   	},
 		    controller: datasetSelectorControllerFunction,
-		   
+
 	   }
 });
 
-function datasetSelectorControllerFunction($scope,cockpitModule_datasetServices,sbiModule_translate,sbiModule_restServices){
+function datasetSelectorControllerFunction($scope,cockpitModule_datasetServices,sbiModule_translate,sbiModule_restServices,cockpitModule_generalOptions){
 	$scope.translate=sbiModule_translate;
+	if(!$scope.datasetSettings) $scope.datasetSettings = {};
 	$scope.availableDatasets=cockpitModule_datasetServices.getAvaiableDatasets();
+
 	$scope.addNewDataset=function(){
-		 cockpitModule_datasetServices.addDataset(undefined,$scope.availableDatasets,false,true,$scope.datasetTypeAvailable || undefined,$scope.datasetTypeExclusion || undefined)
+		 cockpitModule_datasetServices.addDataset(undefined,$scope.availableDatasets,false,true,$scope.datasetTypeAvailable || undefined,$scope.datasetTypeExclusion || undefined,$scope.noParameters || false )
 		 .then(function(data){
 			 $scope.availableDatasets=cockpitModule_datasetServices.getAvaiableDatasets();
 			 $scope.ngModel=data.id.dsId;
 			 $scope.onChange({dsId:data.id.dsId});
+			 $scope.getMetaData($scope.ngModel);
+		 },function(error){
+			 console.log(error);
 		 });
 	}
 	$scope.cancelDataset=function(){
@@ -65,21 +67,25 @@ function datasetSelectorControllerFunction($scope,cockpitModule_datasetServices,
 	}
 	$scope.getMetaData = function(id){
 		if(id){
-			sbiModule_restServices.restToRootProject();
+			$scope.loadingMetadata = true;
+			$scope.dataset = {};
 			var params = cockpitModule_datasetServices.getDatasetParameters(id);
 			for(var p in params){
 				if(params[p].length == 1){
 					params[p] = params[p][0];
 				}
 			}
-			sbiModule_restServices.promisePost("2.0/datasets", encodeURIComponent(cockpitModule_datasetServices.getDatasetLabelById(id)) + "/data",params && JSON.stringify({"parameters": params}))
-				.then(function(data){
-					$scope.dataset = data.data;
-				})
+			for(var d in $scope.availableDatasets){
+				if($scope.availableDatasets[d].id.dsId == id){
+					$scope.dataset = $scope.availableDatasets[d];
+					$scope.datasetSettings.sortingColumn = $scope.datasetSettings.sortingColumn || $scope.dataset.metadata.fieldsMeta[0].name;
+					$scope.datasetSettings.sortingOrder = $scope.datasetSettings.sortingOrder || 'ASC';
+				}
+			};
+			$scope.loadingMetadata = false;
 		}else {
 			$scope.dataset = {};
 		}
-		
 	}
 	
 	$scope.isDatasetAvailable = function(ds){
@@ -110,18 +116,36 @@ function datasetSelectorControllerFunction($scope,cockpitModule_datasetServices,
 		}
 		return true;
 	}
-	
-	if($scope.extended){
-		$scope.getMetaData($scope.ngModel);
+
+	if($scope.ngModel) $scope.getMetaData($scope.ngModel);
+
+	$scope.orderColumn = function(col){
+		if(col.name == $scope.datasetSettings.sortingColumn) {
+			$scope.datasetSettings.sortingOrder = $scope.datasetSettings.sortingOrder == 'ASC' ? 'DESC' : 'ASC';
+		}
+		else{
+			$scope.datasetSettings.sortingColumn = col.name;
+			$scope.datasetSettings.sortingOrder = 'ASC';
+		}
 	}
-	
+
 	var metaDataWatcher = $scope.$watch('ngModel',function(newValue,oldValue){
 		if($scope.extended && newValue!=oldValue){
+			delete $scope.datasetSettings.sortingColumn;
+			delete $scope.datasetSettings.sortingOrder;
 			$scope.getMetaData(newValue);
 		}
 	})
-	
-	
+
+	$scope.getFieldType = function(typeValue){
+		for(var o in cockpitModule_generalOptions.fieldsTypes){
+			if(cockpitModule_generalOptions.fieldsTypes[o].value == typeValue){
+				return cockpitModule_generalOptions.fieldsTypes[o].label;
+			}
+		}
+		return typeValue;
+	}
+
 };
 
 })();

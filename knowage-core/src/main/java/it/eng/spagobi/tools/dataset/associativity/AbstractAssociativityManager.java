@@ -18,14 +18,22 @@
 
 package it.eng.spagobi.tools.dataset.associativity;
 
-import it.eng.spago.error.EMFUserError;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
+import org.jgrapht.graph.Pseudograph;
+
 import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.commons.dao.DAOFactory;
+import it.eng.spagobi.tools.dataset.DatasetManagementAPI;
 import it.eng.spagobi.tools.dataset.bo.DatasetEvaluationStrategyType;
 import it.eng.spagobi.tools.dataset.bo.IDataSet;
-import it.eng.spagobi.tools.dataset.cache.CacheFactory;
-import it.eng.spagobi.tools.dataset.cache.ICache;
-import it.eng.spagobi.tools.dataset.cache.SpagoBICacheConfiguration;
 import it.eng.spagobi.tools.dataset.dao.IDataSetDAO;
 import it.eng.spagobi.tools.dataset.graph.EdgeGroup;
 import it.eng.spagobi.tools.dataset.graph.LabeledEdge;
@@ -36,15 +44,9 @@ import it.eng.spagobi.tools.dataset.graph.associativity.container.IAssociativeDa
 import it.eng.spagobi.tools.dataset.graph.associativity.utils.AssociativeLogicResult;
 import it.eng.spagobi.tools.dataset.graph.associativity.utils.AssociativeLogicUtils;
 import it.eng.spagobi.tools.dataset.metasql.query.item.SimpleFilter;
-import it.eng.spagobi.tools.datasource.bo.IDataSource;
 import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.exceptions.SpagoBIException;
 import it.eng.spagobi.utilities.parameters.ParametersUtilities;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.log4j.Logger;
-import org.jgrapht.graph.Pseudograph;
-
-import java.util.*;
 
 /**
  * @author Alessandro Portosa (alessandro.portosa@eng.it)
@@ -58,8 +60,10 @@ public abstract class AbstractAssociativityManager implements IAssociativityMana
 	protected Map<String, Map<String, String>> datasetToAssociations;
 	protected Pseudograph<String, LabeledEdge<String>> graph;
 	protected Map<String, IAssociativeDatasetContainer> associativeDatasetContainers = new HashMap<>();
+	protected Map<String, List<SimpleFilter>> datasetFilters = new HashMap<>();
 	protected Set<String> documentsAndExcludedDatasets;
 	protected List<SimpleFilter> selections;
+	protected List<SimpleFilter> filters;
 
 	protected AssociativeLogicResult result = new AssociativeLogicResult();
 
@@ -105,6 +109,8 @@ public abstract class AbstractAssociativityManager implements IAssociativityMana
 		this.userProfile = userProfile;
 		initGraph(config);
 		initDocuments(config);
+		selections = config.getSelections();
+		// initExcludedDatasets raccogliere set dataset label dalle selezione, set datasetlabel dal grafo e fare il primo - il secondo (sottrazione) il risultato va messo nella collezione documentsAndExcludedDatasets
 		initDatasets(config);
 	}
 
@@ -114,7 +120,25 @@ public abstract class AbstractAssociativityManager implements IAssociativityMana
 
 	private void initDatasets(Config config) throws SpagoBIException {
 		datasetToAssociations = config.getDatasetToAssociations();
+		filters = config.getFilters();
 		selections = config.getSelections();
+		String datasetFilter = null;
+		for (SimpleFilter fil : filters) {
+		     datasetFilter = fil.getDataset().getName();
+
+		     if (datasetFilters.get(datasetFilter)!=null) {
+		    	 List<SimpleFilter> listaTemp = datasetFilters.get(datasetFilter);
+		    	 listaTemp.add(fil);
+		    	 datasetFilters.put(datasetFilter, listaTemp);
+
+		     }
+		     else {
+		    	 List<SimpleFilter> listaTemp = new ArrayList();
+		    	 listaTemp.add(fil);
+		    	 datasetFilters.put(datasetFilter, listaTemp);
+		     }
+
+		}
 
 		IDataSetDAO dataSetDao = DAOFactory.getDataSetDAO();
 		if (userProfile != null) {
@@ -128,7 +152,7 @@ public abstract class AbstractAssociativityManager implements IAssociativityMana
 				Assert.assertNotNull(dataSet, "Unable to get metadata for dataset [" + v1 + "]");
 
 				Map<String, String> parametersValues = config.getDatasetParameters().get(v1);
-				dataSet.setParamsMap(parametersValues);
+				new DatasetManagementAPI().setDataSetParameters(dataSet,parametersValues);
 
 				boolean isNearRealtime = config.getNearRealtimeDatasets().contains(v1);
 				DatasetEvaluationStrategyType evaluationStrategyType = dataSet.getEvaluationStrategy(isNearRealtime);
@@ -204,10 +228,52 @@ public abstract class AbstractAssociativityManager implements IAssociativityMana
 						String missingColumn = datasetToAssociations.get(dataset).get(edgeName);
 						if (ParametersUtilities.isParameter(missingColumn)) {
 							String missingParameter = ParametersUtilities.getParameterName(missingColumn);
-							String value = associativeDatasetContainers.get(dataset).getParameters().get(missingParameter);
-							HashSet<Tuple> tuples = new HashSet<Tuple>();
-							tuples.add(new Tuple(value));
-							groupToValues.put(missingColumn, tuples);
+
+							if (associativeDatasetContainers.get(dataset)!=null) {  // dataset case
+
+								String value = associativeDatasetContainers.get(dataset).getParameters().get(missingParameter);
+								HashSet<Tuple> tuples = new HashSet<Tuple>();
+								Tuple tuple = new Tuple(value != null && value.startsWith("'") && value.endsWith("'") ? value.substring(1, value.length() - 1) :
+									value);
+								tuples.add(tuple);
+								groupToValues.put(missingColumn, tuples);
+
+							}
+							else {      // document case
+
+								if (datasetToAssociations.get(dataset)!=null) {
+
+									Map<String, String> parametersByEdgeGroup = datasetToAssociations.get(dataset);
+
+									for (String param : parametersByEdgeGroup.keySet()) {
+
+										if(parametersByEdgeGroup.get(param).equals(missingColumn)){
+
+											if(edgeName.equals(param)) {
+												for (EdgeGroup edgeGr : groups) {
+
+													if(edgeGr.getEdgeNames().contains(edgeName)) {
+
+
+														Set<Tuple> tuples =	result.getEdgeGroupValues().get(edgeGr);  // set of associative values linked to a param and edgegroup
+
+														groupToValues.put(missingColumn, tuples);
+													}
+
+												}
+
+
+											}
+
+
+
+										}
+
+									}
+
+								}
+
+							}
 						}
 					}
 				}

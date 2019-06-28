@@ -17,11 +17,13 @@
  */
 package it.eng.spagobi.api;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
@@ -36,6 +38,7 @@ import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.json.JSONObjectDeserializator;
 
 import it.eng.spago.security.IEngUserProfile;
 import it.eng.spagobi.commons.bo.UserProfile;
@@ -50,6 +53,7 @@ import it.eng.spagobi.tools.dataset.common.datastore.IDataStore;
 import it.eng.spagobi.tools.dataset.common.datawriter.JSONDataWriter;
 import it.eng.spagobi.tools.dataset.dao.IDataSetDAO;
 import it.eng.spagobi.utilities.exceptions.SpagoBIRestServiceException;
+import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
 import it.eng.spagobi.utilities.exceptions.SpagoBIServiceException;
 import it.eng.spagobi.utilities.themes.ThemesManager;
 import it.eng.spagobi.wapp.services.ChangeTheme;
@@ -66,7 +70,7 @@ public class SelfServiceDataSetPreviewResource extends AbstractSpagoBIResource {
 	@Path("/export/{label}")
 	@Produces(MediaType.APPLICATION_JSON + "; charset=UTF-8")
 	public String exportData(@PathParam("label") String label, @Context HttpServletRequest req) {
-		String res = loadData(label, req, 0, Integer.MAX_VALUE, 0, null, null, null, null, null, null, null);
+		String res = loadData(label, req, 0, Integer.MAX_VALUE, 0, null, null, null, null, null, null, null, null);
 		return res;
 	}
 
@@ -77,7 +81,7 @@ public class SelfServiceDataSetPreviewResource extends AbstractSpagoBIResource {
 			@QueryParam("limit") Integer limit, @QueryParam("page") Integer page, @QueryParam("dataSetParameters") String dataSetParameters,
 			@QueryParam("sort") JSONArray sortOptions, @QueryParam("valueFilter") String valueFilter, @QueryParam("columnsFilter") String columnsFilter,
 			@QueryParam("columnsFilterDescription") String columnsFilterDescription, @QueryParam("typeValueFilter") String typeValueFilter,
-			@QueryParam("typeFilter") String typeFilter) {
+			@QueryParam("typeFilter") String typeFilter, @QueryParam("DRIVERS") JSONObject driversMap) {
 
 		logger.debug("Retriving data for the preview");
 
@@ -85,7 +89,13 @@ public class SelfServiceDataSetPreviewResource extends AbstractSpagoBIResource {
 
 		boolean isDatasetVisible = false;
 		Map<String, Object> parametersMap = new HashMap<String, Object>();
-
+		Map<String, Object> driversRuntimeMap;
+		try {
+			driversRuntimeMap = JSONObjectDeserializator.getHashMapFromJSONObject(driversMap);
+		} catch (IOException e1) {
+			logger.error("Getting Drivers has encoutered error");
+			throw new SpagoBIRuntimeException(e1.getLocalizedMessage(), e1);
+		}
 		// Adding the parameters for sort, filters and dataset parameters
 		logger.debug("Adding filters, sorting, parameters");
 		addSortParam(sortOptions, parametersMap);
@@ -117,6 +127,7 @@ public class SelfServiceDataSetPreviewResource extends AbstractSpagoBIResource {
 			IDataSetDAO dao = DAOFactory.getDataSetDAO();
 			dao.setUserProfile(profile);
 			IDataSet ds = dao.loadDataSetByLabel(label);
+
 			List<IDataSet> datsets = dao.loadMyDataDataSets(profile);
 
 			if (ds == null) {
@@ -150,6 +161,18 @@ public class SelfServiceDataSetPreviewResource extends AbstractSpagoBIResource {
 
 			logger.debug("Setting parameters");
 			ds.setParamsMap(parametersMap);
+
+			Set<String> driverUrlNames = driversRuntimeMap.keySet();
+			for (String driverName : driverUrlNames) {
+				Map mapOfValues = (Map) driversRuntimeMap.get(driverName);
+				if (mapOfValues.containsKey("value")) {
+					if (mapOfValues.get("value") instanceof List && mapOfValues.get("value") != null && !((List) mapOfValues.get("value")).isEmpty()
+							|| !(mapOfValues.get("value") instanceof List) && !"".equals(mapOfValues.get("value"))) {
+						logger.debug("Setting drivers");
+						ds.setDrivers(driversRuntimeMap);
+					}
+				}
+			}
 
 			logger.debug("Loading the data");
 			ds.loadData(start, limit, GeneralUtilities.getDatasetMaxResults());
@@ -364,4 +387,23 @@ public class SelfServiceDataSetPreviewResource extends AbstractSpagoBIResource {
 		}
 		return locale;
 	}
+
+	// private Map parseJsonDriversMap(JSONObject drivers) {
+	// HashMap<String, Object> driversMap = new HashMap<>();
+	// try {
+	// for (int i = 0; i < JSONObject.getNames(drivers).length; i++) {
+	// if (drivers.getString(JSONObject.getNames(drivers)[i]) != "" && (i & 1) == 0) {
+	// if (drivers.get(JSONObject.getNames(drivers)[i]) instanceof JSONArray) {
+	// String arrayValue = drivers.getJSONArray(JSONObject.getNames(drivers)[i]).getJSONObject(0).getString("value");
+	// driversMap.put(JSONObject.getNames(drivers)[i], arrayValue);
+	// } else
+	// driversMap.put(JSONObject.getNames(drivers)[i], drivers.getString(JSONObject.getNames(drivers)[i]));
+	// }
+	// }
+	// } catch (JSONException e) {
+	// logger.debug("Unsuccessful parsing of JSONObject to map");
+	// throw new JsonException(e.getLocalizedMessage(), e);
+	// }
+	// return driversMap;
+	// }
 }

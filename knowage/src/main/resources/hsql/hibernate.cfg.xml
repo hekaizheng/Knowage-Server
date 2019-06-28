@@ -62,6 +62,7 @@
 		<mapping resource="it/eng/spagobi/analiticalmodel/document/metadata/mapping/SbiObjState.hbm.xml" />
 		<mapping resource="it/eng/spagobi/analiticalmodel/document/metadata/mapping/SbiSubreports.hbm.xml" />
 		<mapping resource="it/eng/spagobi/analiticalmodel/document/metadata/mapping/SbiViewpoints.hbm.xml" />
+		<mapping resource="it/eng/spagobi/tools/catalogue/metadata/mapping/SbiMetaModelViewpoints.hbm.xml" />
 		<mapping resource="it/eng/spagobi/analiticalmodel/functionalitytree/metadata/mapping/SbiFunctions.hbm.xml" />
 		<mapping resource="it/eng/spagobi/analiticalmodel/functionalitytree/metadata/mapping/SbiFuncRole.hbm.xml" />
 		<mapping resource="it/eng/spagobi/monitoring/metadata/mapping/SbiAudit.hbm.xml" />
@@ -144,9 +145,9 @@
 		<!-- tools: Meta-models catalogue -->
 		<mapping resource="it/eng/spagobi/tools/catalogue/metadata/mapping/SbiMetaModel.hbm.xml" />
 		<mapping resource="it/eng/spagobi/tools/catalogue/metadata/mapping/SbiMetaModelContent.hbm.xml" />
-<!-- 		<mapping resource="it/eng/spagobi/tools/catalogue/metadata/mapping/SbiMetaModelParameter.hbm.xml" /> -->
-<!-- 		<mapping resource="it/eng/spagobi/tools/catalogue/metadata/mapping/SbiMetamodelParuse.hbm.xml" /> -->
-<!-- 		<mapping resource="it/eng/spagobi/tools/catalogue/metadata/mapping/SbiMetamodelParview.hbm.xml" /> -->
+ 		<mapping resource="it/eng/spagobi/tools/catalogue/metadata/mapping/SbiMetaModelParameter.hbm.xml" />
+ 		<mapping resource="it/eng/spagobi/tools/catalogue/metadata/mapping/SbiMetamodelParuse.hbm.xml" />
+  		<mapping resource="it/eng/spagobi/tools/catalogue/metadata/mapping/SbiMetaModelParview.hbm.xml" />
 			
 		<!-- Federation definition -->
 		<mapping resource="it/eng/spagobi/federateddataset/metadata/mapping/SbiFederationDefinition.hbm.xml"/>
@@ -224,6 +225,10 @@
      	 <mapping resource="it/eng/spagobi/functions/metadata/mapping/SbiFunctionInputDataset.hbm.xml" />
          <mapping resource="it/eng/spagobi/functions/metadata/mapping/SbiFunctionOutput.hbm.xml" />
          <mapping resource="it/eng/spagobi/functions/metadata/mapping/SbiFunctionInputFile.hbm.xml" />
+		
+	 <!-- News Management -->
+        <mapping resource="it/eng/spagobi/tools/news/metadata/mapping/SbiNews.hbm.xml" />
+        <mapping resource="it/eng/spagobi/tools/news/metadata/mapping/SbiNewsRead.hbm.xml" />
          
          
          <!-- Workspace organizer mapping -->   
@@ -232,6 +237,10 @@
          
          <!-- Whatif workflow mapping -->
          <mapping resource="it/eng/spagobi/whatif/metadata/mapping/SbiWhatifWorkflow.hbm.xml" />
+         
+         <!-- Tags mapping -->
+         <mapping resource="it/eng/spagobi/tools/tag/metadata/mapping/SbiTag.hbm.xml" />
+         <mapping resource="it/eng/spagobi/tools/tag/metadata/mapping/SbiDataSetTag.hbm.xml" />
         
         <!-- end mapping -->
         

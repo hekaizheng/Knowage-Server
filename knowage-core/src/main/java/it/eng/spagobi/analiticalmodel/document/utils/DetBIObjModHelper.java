@@ -428,10 +428,8 @@ public class DetBIObjModHelper {
 			IDomainDAO domaindao = DAOFactory.getDomainDAO();
 			domaindao.setUserProfile(profile);
 			List types = domaindao.loadListDomainsByTypeAndTenant("BIOBJ_TYPE");
-
 			// List types = domaindao.loadListDomainsByType("BIOBJ_TYPE");
 			// load list of states and engines
-
 			List states = domaindao.loadListDomainsByType("STATE");
 			// List states = domaindao.loadListDomainsByTypeAndTenant("STATE");
 			IEngineDAO enginedao = DAOFactory.getEngineDAO();

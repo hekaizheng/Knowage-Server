@@ -12,7 +12,7 @@
 	<artifactId>knowagecockpitengine</artifactId>
 	<packaging>war</packaging>
 	<name>knowagecockpitengine</name>
-
+	
 	<build>
 		<finalName>knowagecockpitengine</finalName>
 	    <plugins>
@@ -23,24 +23,89 @@
 	                <classesClassifier>classes</classesClassifier>
 	            </configuration>
 	        </plugin>
-			<plugin>
-				<groupId>org.codehaus.cargo</groupId>
-				<artifactId>cargo-maven2-plugin</artifactId>
-				<version>1.6.9</version>
-				<configuration>
-					<container>
-						<containerId>tomcat8x</containerId>
-						<type>installed</type>
-						<home>${application-home}</home>
-					</container>
-					<configuration>
-						<type>existing</type>
-						<home>${application-home}</home>
-					</configuration>
-				</configuration>
-			</plugin>
-	    </plugins>
+      	</plugins>
 	</build>
+	
+	<profiles>
+		<profile>
+			<id>development</id>
+            <activation>
+                <!-- this profile is active by default -->
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+           		<application.environment>development</application.environment>
+            </properties>
+         	<build>
+			    <plugins>
+					<plugin>
+						<groupId>org.codehaus.cargo</groupId>
+						<artifactId>cargo-maven2-plugin</artifactId>
+						<version>1.6.9</version>
+						<configuration>
+							<container>
+								<containerId>tomcat8x</containerId>
+								<type>installed</type>
+								<home>${application-home}</home>
+							</container>
+							<configuration>
+								<type>existing</type>
+								<home>${application-home}</home>
+							</configuration>
+						</configuration>
+					</plugin>
+			    </plugins>
+			</build>
+		</profile>
+		
+		<profile>
+			<id>production</id>
+            <properties>
+           		<application.environment>production</application.environment>
+           		<disable.console.logging>*/console.log = function() {}; console.warn = function() {}; console.debug = function() {}; console.info = function() {};  /*</disable.console.logging>
+            </properties>
+         	<build>
+			    <plugins>
+			        <plugin>
+			        	<groupId>org.apache.maven.plugins</groupId>
+			            <artifactId>maven-war-plugin</artifactId>
+			            <configuration>   		            	   
+							<warSourceExcludes>js/src/**</warSourceExcludes>
+							<webResources>
+								<resource>
+									<directory>src/main/webapp</directory>
+									<filtering>true</filtering>
+									<includes>
+										<include>**/angularImport.jsp</include>
+									</includes>									
+								</resource>
+						        <resource>
+						          <directory>src/main/webapp/js/src</directory>
+						          <targetPath>js/src-${project.version}</targetPath>
+						        </resource>
+					      </webResources>
+			            </configuration>
+			        </plugin>
+					<plugin>
+						<groupId>org.codehaus.cargo</groupId>
+						<artifactId>cargo-maven2-plugin</artifactId>
+						<version>1.6.9</version>
+						<configuration>
+							<container>
+								<containerId>tomcat8x</containerId>
+								<type>installed</type>
+								<home>${application-home}</home>
+							</container>
+							<configuration>
+								<type>existing</type>
+								<home>${application-home}</home>
+							</configuration>
+						</configuration>
+					</plugin>
+			    </plugins>
+			</build>
+		</profile>
+	</profiles>
 	
 	<dependencies>
 
@@ -87,6 +152,13 @@
 			<artifactId>velocity</artifactId>
 			<version>1.7</version>
 			<scope>compile</scope>
+		</dependency>
+		
+		<!-- https://mvnrepository.com/artifact/velocity-tools/velocity-tools -->
+		<dependency>
+		    <groupId>velocity-tools</groupId>
+		    <artifactId>velocity-tools</artifactId>
+		    <version>1.4</version>
 		</dependency>
 		
 		<dependency>

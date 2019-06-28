@@ -35,11 +35,11 @@ angular
 	                                'recent_view',
 	                                'smartfilters_view_workspace',
 	                                'ckan_view',
-	                                'dataset_wizard_meta',
 	                                'folder_view',
 	                                'bread_crumb',
 	                                'organizer_view',
 	                                'document_tree',
 	                                'schedulation_view',
-	                                'document_schedulation'
+	                                'document_schedulation',
+	                                'agGrid'
 	                                ]);

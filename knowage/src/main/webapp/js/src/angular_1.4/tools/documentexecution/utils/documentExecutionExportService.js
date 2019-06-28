@@ -2,7 +2,7 @@
 	var documentExecutionModule = angular.module('documentExecutionModule');
 
 	documentExecutionModule.service('docExecute_exportService', function(sbiModule_translate,sbiModule_config,
-			execProperties,sbiModule_user,sbiModule_restServices,$http,sbiModule_dateServices, documentExecuteServices, sbiModule_download, $q, $rootScope, sbiModule_messaging,multipartForm,$sce,$mdPanel,$mdToast) {
+			execProperties,sbiModule_user,sbiModule_restServices,windowCommunicationService,$http,sbiModule_dateServices, documentExecuteServices, sbiModule_download, $q, $rootScope, sbiModule_messaging,multipartForm,$sce,$mdPanel,$mdToast) {
 
 		var dee = this;
 
@@ -274,36 +274,46 @@
 
 
 		dee.exportCockpitTo = function(exportType, mimeType){
-			dee.exporting = true;
-
-			dee.getBackendRequestParams(exportType, mimeType).then(function(parameters){
-				dee.buildBackendRequestConf(exportType, mimeType, parameters)
-				.then(function(requestConf){
-					var exportingToast = sbiModule_messaging.showInfoMessage(sbiModule_translate.load("sbi.execution.executionpage.toolbar.export.exporting"), 'Success!', 0);
-					$http(requestConf)
-					.then(function successCallback(response) {
-						var mimeType = response.headers("Content-type");
-						var fileAndExtension = response.headers("Content-Disposition")
-						$mdToast.hide(exportingToast);
+			if(exportType.toLowerCase() == 'pdf'){
+				windowCommunicationService.sendMessage('pdfExport');
+			}else{
+				documentFrame.window.angular.element(document).find('iframe').contents().find('body').scope();
+				dee.exporting = true;
+	
+				dee.getBackendRequestParams(exportType, mimeType).then(function(parameters){
+					var promise;
+					if (exportType.toLowerCase() == 'xls' || exportType.toLowerCase() == 'xlsx')
+						promise = buildRequestConfiguration(exportType, parameters);
+					else
+						promise = dee.buildBackendRequestConf(exportType, mimeType, parameters);						
+					
+					promise.then(function(requestConf){
+						var exportingToast = sbiModule_messaging.showInfoMessage(sbiModule_translate.load("sbi.execution.executionpage.toolbar.export.exporting"), 'Success!', 0);
+						$http(requestConf)
+						.then(function successCallback(response) {
+							var mimeType = response.headers("Content-type");
+							var fileAndExtension = response.headers("Content-Disposition")
+							$mdToast.hide(exportingToast);
+							dee.exporting = false;
+							sbiModule_download.getBlob(
+									response.data,
+									execProperties.executionInstance.OBJECT_LABEL,
+									mimeType,
+									exportType, mimeType,fileAndExtension);
+						}, function errorCallback(response) {
+							$mdToast.cancel(exportingToast);
+							dee.exporting = false;
+							sbiModule_messaging.showErrorMessage(response.errors[0].message, 'Error');
+						});
+					},function(e){
 						dee.exporting = false;
-						sbiModule_download.getBlob(
-								response.data,
-								execProperties.executionInstance.OBJECT_LABEL,
-								mimeType,
-								exportType, mimeType,fileAndExtension);
-					}, function errorCallback(response) {
-						$mdToast.cancel(exportingToast);
-						dee.exporting = false;
-						sbiModule_messaging.showErrorMessage(response.errors[0].message, 'Error');
+						sbiModule_messaging.showErrorMessage(e, 'Error');
 					});
 				},function(e){
 					dee.exporting = false;
 					sbiModule_messaging.showErrorMessage(e, 'Error');
 				});
-			},function(e){
-				dee.exporting = false;
-				sbiModule_messaging.showErrorMessage(e, 'Error');
-			});
+			}
 		};
 
 		dee.getBackendRequestParams = function(exportType, mimeType){
@@ -347,7 +357,7 @@
 						}
 					},
 					disableParentScroll: true,
-					templateUrl: sbiModule_config.contextName + '/js/src/angular_1.4/tools/documentexecution/templates/popupPdfExportParametersDialogTemplate.html',
+					templateUrl: sbiModule_config.dynamicResourcesBasePath + '/angular_1.4/tools/documentexecution/templates/popupPdfExportParametersDialogTemplate.html',
 					position: $mdPanel.newPanelPosition().absolute().center(),
 					trapFocus: true,
 //					zIndex: 150,
@@ -457,13 +467,10 @@
 		dee.buildBackendRequestConf = function(exportType, mimeType, parameters){
 			var deferred = $q.defer();
 
-			var eleToAtt=document.body;
-
-
 			var requestUrl = sbiModule_config.host;
 			requestUrl += execProperties.documentUrl;
 			requestUrl += '&outputType=' + encodeURIComponent(exportType);
-
+			
 			for (var parameter in parameters) {
 			    if (parameters.hasOwnProperty(parameter)) {
 			    	requestUrl += '&' + parameter + '=' + encodeURIComponent(parameters[parameter]);
@@ -473,14 +480,14 @@
 			var aggregations = documentFrame.window.angular.element(document).find('iframe').contents().find('body').scope().cockpitModule_template.configuration.aggregations;
 			var filters = documentFrame.window.angular.element(document).find('iframe').contents().find('body').scope().cockpitModule_template.configuration.filters;
 			var cockpitSelections = {};
-			cockpitSelections.aggregations = aggregations;
+			cockpitSelections.aggregations = angular.copy(aggregations);
 			cockpitSelections.filters = filters;
             requestUrl += '&COCKPIT_SELECTIONS=' + encodeURIComponent(JSON.stringify(cockpitSelections));
-
+            
 			var requestConf = {
 					method: 'GET',
 					url: requestUrl,
-					responseType: 'arraybuffer',
+					responseType: 'arraybuffer'
 			};
 
 			if(exportType.toLowerCase() != 'xlsx') {
@@ -508,63 +515,45 @@
 			}
 			return deferred.promise;
 		};
+		
+		var buildRequestConfiguration = function(exportType, parameters) {
+			var deferred = $q.defer();
+			
+			var requestUrl = sbiModule_config.host + '/' + execProperties.executionInstance.ENGINE_LABEL + '/api/1.0/cockpit/export/excel';
+			
+			var body = {
+					user_id: sbiModule_user.userUniqueIdentifier,
+					outputType: exportType,
+					document: execProperties.executionInstance.OBJECT_ID,
+					DOCUMENT_LABEL: execProperties.executionInstance.OBJECT_LABEL,
+					SBI_COUNTRY: sbiModule_config.curr_country,
+					SBI_LANGUAGE: sbiModule_config.curr_language
+				};
+				
+				for (var parameter in parameters) {
+				    if (parameters.hasOwnProperty(parameter)) {
+				    	body.parameter = parameters[parameter];
+				    }
+				}
 
-//		dee.exportationHandlers = {
-//			'CHART': [
-//				 {'description' : sbiModule_translate.load('sbi.execution.PdfExport') , 'iconClass': 'fa fa-file-pdf-o', 'func': function(){dee.exportDocumentChart('PDF')} }
-//				 ,{'description' : sbiModule_translate.load('sbi.execution.JpgExport') , 'iconClass':'fa fa-file-image-o', 'func': function() {dee.exportDocumentChart('JPG')} }
-//			],
-//			'DOCUMENT_COMPOSITE': [
-//			    {'description' : sbiModule_translate.load('sbi.execution.PdfExport') , 'iconClass': 'fa fa-file-pdf-o', 'func': function(){dee.exportCockpitTo('pdf','application/pdf')} }
-//			    ,{'description' : sbiModule_translate.load('sbi.execution.XlsExport') , 'iconClass':'fa fa-file-excel-o', 'func': function() {dee.exportCockpitTo('xls','application/vnd.ms-excel')} }
-//			    ,{'description' : sbiModule_translate.load('sbi.execution.XlsxExport') , 'iconClass':'fa fa-file-excel-o', 'func': function() {dee.exportCockpitTo('xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')} }
-////			    {'description' : sbiModule_translate.load('sbi.execution.PdfExport') , 'iconClass': 'fa fa-file-pdf-o', 'func': function(){dee.exportCockpitTo('pdf')} }
-////			    ,{'description' : sbiModule_translate.load('sbi.execution.XlsExport') , 'iconClass':'fa fa-file-excel-o', 'func': function() {dee.exportCockpitTo('xls')} }
-////			    ,{'description' : sbiModule_translate.load('sbi.execution.XlsxExport') , 'iconClass':'fa fa-file-excel-o', 'func': function() {dee.exportCockpitTo('xlsx')} }
-//			],
-//			'REPORT': [
-//				{'description' : sbiModule_translate.load('sbi.execution.PdfExport') , 'iconClass': 'fa fa-file-pdf-o', 'func': function(){dee.exportReportTo('PDF')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.XlsExport') , 'iconClass':'fa fa-file-excel-o', 'func': function() {dee.exportReportTo('XLS')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.XlsxExport') , 'iconClass':'fa fa-file-excel-o', 'func': function() {dee.exportReportTo('XLSX')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.rtfExport') , 'iconClass':'fa fa-file-excel-o', 'func': function() {dee.exportReportTo('RTF')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.docExport') , 'iconClass':'fa fa-file-word-o', 'func': function() {dee.exportReportTo('DOC')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.docxExport') , 'iconClass':'fa fa-file-word-o', 'func': function() {dee.exportReportTo('DOCX')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.CsvExport') , 'iconClass':'fa fa-file-excel-o', 'func': function() {dee.exportReportTo('CSV')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.XmlExport') , 'iconClass':'fa fa-file-code-o', 'func': function() {dee.exportReportTo('XML')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.JpgExport') , 'iconClass':'fa fa-file-image-o', 'func': function() {dee.exportReportTo('JPG')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.txtExport') , 'iconClass':'fa fa-file-text-o', 'func': function() {dee.exportReportTo('TXT')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.pptExport') , 'iconClass':'fa fa-file-text-o', 'func': function() {dee.exportReportTo('PPT')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.pptxExport') , 'iconClass':'fa fa-file-text-o', 'func': function() {dee.exportReportTo('PPTX')} }
-//				],
-//			'OLAP': [
-//		         {'description' : sbiModule_translate.load('sbi.execution.PdfExport') , 'iconClass': 'fa fa-file-pdf-o', 'func': function(){dee.exportOlapTo('PDF')} }
-//		         ,{'description' : sbiModule_translate.load('sbi.execution.XlsExport') , 'iconClass':'fa fa-file-excel-o', 'func': function() {dee.exportOlapTo('XLS')} }
-//		         ],
-//	        'DASH': [
-//	              	   {'description' : sbiModule_translate.load('sbi.execution.PdfExport') , 'iconClass': 'fa fa-file-pdf-o', 'func': function(){dee.exportChartTo('PDF')} }
-//	              	   ],
-//      	    'MAP': [
-//		        {'description' : sbiModule_translate.load('sbi.execution.PdfExport') , 'iconClass': 'fa fa-file-pdf-o', 'func': function(){dee.exportGeoTo('pdf')} }
-//		       // ,{'description' : sbiModule_translate.load('sbi.execution.JpgExport') , 'iconClass':'fa fa-file-image-o', 'func': function() {dee.exportGeoTo('jpeg')} }
-//			],
-//			'DATAMART': [
-//				{'description' : sbiModule_translate.load('sbi.execution.PdfExport') , 'iconClass': 'fa fa-file-pdf-o', 'func': function(){dee.exportQbeTo('application/pdf')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.XlsExport') , 'iconClass':'fa fa-file-excel-o', 'func': function() {dee.exportQbeTo('application/vnd.ms-excel')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.XlsxExport') , 'iconClass':'fa fa-file-excel-o', 'func': function() {dee.exportQbeTo('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.rtfExport') , 'iconClass':'fa fa-file-excel-o', 'func': function() {dee.exportQbeTo('application/rtf')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.CsvExport') , 'iconClass':'fa fa-file-excel-o', 'func': function() {dee.exportQbeTo('text/csv')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.jrxmlExport') , 'iconClass':'fa fa-file-text-o', 'func': function() {dee.exportQbeTo('text/jrxml')} }
-//				,{'description' : sbiModule_translate.load('sbi.execution.jsonExport') , 'iconClass':'fa fa-file-text-o', 'func': function() {dee.exportQbeTo('application/json')} }
-//			],
-//			'NETWORK': [
-//			            {'description' : sbiModule_translate.load('sbi.execution.PdfExport') , 'iconClass': 'fa fa-file-pdf-o', 'func': function(){dee.exportNetworkTo('pdf')} }
-//			            ,{'description' : sbiModule_translate.load('sbi.execution.PngExport') , 'iconClass':'fa fa-file-image-o', 'func': function() {dee.exportNetworkTo('png')} }
-//			            ,{'description' : sbiModule_translate.load('sbi.execution.GraphmlExport') , 'iconClass':'fa fa-file-image-o', 'func': function() {dee.exportNetworkTo('graphml')} }
-//			            ]
-//		};
-
-
-
+				var aggregations = documentFrame.window.angular.element(document).find('iframe').contents().find('body').scope().cockpitModule_template.configuration.aggregations;
+				var filters = documentFrame.window.angular.element(document).find('iframe').contents().find('body').scope().cockpitModule_template.configuration.filters;
+				var cockpitSelections = {};
+				cockpitSelections.aggregations = angular.copy(aggregations);
+				cockpitSelections.filters = filters;
+	            body.COCKPIT_SELECTIONS = cockpitSelections;
+	            
+				var requestConf = {
+					method: 'POST',
+					url: requestUrl,
+					responseType: 'arraybuffer',
+					data: body
+				};
+				
+				deferred.resolve(requestConf);
+				return deferred.promise;
+		}
+		
 		dee.getExporters = function(engine, type) {
 			 return $q(function(resolve, reject) {
 				var exportationHandlers = {};

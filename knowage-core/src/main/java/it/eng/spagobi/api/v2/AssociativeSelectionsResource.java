@@ -86,6 +86,7 @@ public class AssociativeSelectionsResource extends AbstractDataSetResource {
 		String selectionsString = null;
 		String datasetsString = null;
 		String nearRealtimeDatasetsString = null;
+		String filtersString = null;
 		try {
 			if (StringUtilities.isNotEmpty(body)) {
 				JSONObject jsonBody = new JSONObject(body);
@@ -101,6 +102,9 @@ public class AssociativeSelectionsResource extends AbstractDataSetResource {
 
 				JSONArray jsonNearRealtime = jsonBody.optJSONArray("nearRealtime");
 				nearRealtimeDatasetsString = jsonNearRealtime != null ? jsonNearRealtime.toString() : null;
+
+				JSONArray jsonFilters = jsonBody.optJSONArray("filters");
+				filtersString = jsonFilters != null ? jsonFilters.toString() : null;
 			}
 
 			IDataSetDAO dataSetDAO = getDataSetDAO();
@@ -122,7 +126,7 @@ public class AssociativeSelectionsResource extends AbstractDataSetResource {
 
 			JSONObject associationGroupObject = new JSONObject(associationGroupString);
 			AssociationGroup associationGroup = serializer.deserialize(associationGroupObject);
-			fixAssociationGroup(associationGroup);
+			fixAssociationGroup(associationGroup);   // fixes qbe dataset columns
 
 			// parse documents
 			Set<String> documents = new HashSet<>();
@@ -179,8 +183,35 @@ public class AssociativeSelectionsResource extends AbstractDataSetResource {
 			Map<String, Map<String, String>> datasetToAssociationToColumnMap = analyzer.getDatasetToAssociationToColumnMap();
 			Pseudograph<String, LabeledEdge<String>> graph = analyzer.getGraph();
 
+
+
+			DataSetResource dataRes = new DataSetResource();
+			List<SimpleFilter> filtersList = new ArrayList();
+			IDataSet dataSetInFilter = null;
+			if (filtersString != null && !filtersString.isEmpty()) {
+				JSONArray jsonArray = new JSONArray(filtersString);
+
+				JSONArray firstFilterValues = null;
+
+				if (jsonArray instanceof JSONArray) {
+
+
+					for (int i = 0; i < jsonArray.length(); i++) { // looking for filter embedded in array
+						JSONObject filterJsonObject = jsonArray.optJSONObject(i);
+						if (filterJsonObject != null && filterJsonObject.has("filterOperator")) {
+							dataSetInFilter= getDataSetDAO().loadDataSetByLabel(filterJsonObject.optString("dataset"));
+							filterJsonObject.optString("filterOperator");
+							firstFilterValues = filterJsonObject.getJSONArray("filterVals");
+							SimpleFilter firstSimpleFilter =  dataRes.getFilter(filterJsonObject.optString("filterOperator"), firstFilterValues, filterJsonObject.optString("colName"), dataSetInFilter, null);
+							filtersList.add(firstSimpleFilter);
+						}
+					}
+				}
+			}
+
+
 			// get datasets from selections
-			List<SimpleFilter> filters = new ArrayList<>();
+			List<SimpleFilter> selectionsFilters = new ArrayList<>();
 			Map<String, Map<String, Set<Tuple>>> selectionsMap = new HashMap<>();
 
 			Iterator<String> it = selectionsObject.keys();
@@ -203,7 +234,7 @@ public class AssociativeSelectionsResource extends AbstractDataSetResource {
 				Projection projection = new Projection(dataSet, column);
 				List<Object> valueObjects = new ArrayList<>();
 
-				Object object = selectionsObject.getJSONArray(datasetDotColumn);
+				Object object = selectionsObject.get(datasetDotColumn);
 				if (object instanceof JSONArray) {
 					JSONArray jsonArray = (JSONArray) object;
 					for (int i = 0; i < jsonArray.length(); i++) {
@@ -215,7 +246,7 @@ public class AssociativeSelectionsResource extends AbstractDataSetResource {
 					valueObjects.add(valueForQuery);
 				}
 
-				filters.add(new InFilter(projection, valueObjects));
+				selectionsFilters.add(new InFilter(projection, valueObjects));
 
 				if (!selectionsMap.containsKey(datasetLabel)) {
 					selectionsMap.put(datasetLabel, new HashMap<String, Set<Tuple>>());
@@ -232,10 +263,10 @@ public class AssociativeSelectionsResource extends AbstractDataSetResource {
 				}
 			}
 
-			logger.debug("Filter list: " + filters);
+			logger.debug("Selections list: " + selectionsFilters);
 
 			String strategy = SingletonConfig.getInstance().getConfigValue(ConfigurationConstants.SPAGOBI_DATASET_ASSOCIATIVE_LOGIC_STRATEGY);
-			Config config = AssociativeLogicUtils.buildConfig(strategy, graph, datasetToAssociationToColumnMap, filters, nearRealtimeDatasets,
+			Config config = AssociativeLogicUtils.buildConfig(strategy, graph, datasetToAssociationToColumnMap, selectionsFilters,filtersList, nearRealtimeDatasets,
 					datasetParameters, documents);
 
 			IAssociativityManager manager = AssociativeStrategyFactory.createStrategyInstance(config, getUserProfile());
@@ -250,14 +281,7 @@ public class AssociativeSelectionsResource extends AbstractDataSetResource {
 				Map<String, Set<Tuple>> calcSelections = selections.get(d);
 				Map<String, Set<Tuple>> inputSelections = selectionsMap.get(d);
 				for (String selectionKey : inputSelections.keySet()) {
-					if (calcSelections.containsKey(selectionKey)) { // intersect tuples
-						Set<Tuple> oldSelectionTuples = calcSelections.get(selectionKey);
-						Set<Tuple> newSelectionTuples = inputSelections.get(selectionKey);
-						newSelectionTuples.retainAll(oldSelectionTuples);
-						calcSelections.put(selectionKey, newSelectionTuples);
-					} else { // add tuples
-						calcSelections.put(selectionKey, inputSelections.get(selectionKey));
-					}
+					calcSelections.put(selectionKey, inputSelections.get(selectionKey));
 				}
 			}
 

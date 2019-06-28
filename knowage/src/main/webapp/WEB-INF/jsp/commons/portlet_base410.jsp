@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 	        <body class="ie-9">
 	    <![endif]-->
 <!--[if !IE]><!-->
-<body>
+<body class="kn-main-body">
 	<script>  
 			if (/*@cc_on!@*/false) {  
 				document.documentElement.className+=' ie10';  
@@ -372,11 +372,34 @@ String extTheme=ThemesManager.getTheExtTheme(currTheme);
 	
 </script>
 
+<style>
+	#pleaserotate-graphic{
+        fill: #fff;
+    }
+
+    #pleaserotate-backdrop {
+        color: #fff;
+        background-color: #000;
+    }
+</style>
+<script>
+var PleaseRotateOptions = {
+	    message: "Please Rotate Your Device",
+	    subMessage: "For a better mobile experience",
+	    allowClickBypass: false,
+	    onlyMobile: false,
+	    zIndex: 9999
+	};
+	
+</script>
+
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "node_modules/pleaserotate.js/pleaserotate.min.js")%>"></script>
+
 <%-- ---------------------------------------------------------------------- --%>
 <%-- INCLUDE Angular JS														--%>
 <%-- ---------------------------------------------------------------------- --%>
 	<%@include file="/WEB-INF/jsp/commons/angular/angularImport.jsp"%>
-	
+	<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "/node_modules/jquery/dist/jquery.min.js")%>"></script> 
 	<link rel="stylesheet" href="<%=urlBuilder.getResourceLink(request,"/js/lib/bootstrap/css/bootstrap.min.css")%>">
 	<link id="spagobi-angular" rel="styleSheet"	href="<%=urlBuilder.getResourceLink(request,"/themes/sbi_default/css/menuBar/style.css")%>" type="text/css" />
 	<link id="spagobi-angular" rel="styleSheet"	href="<%=urlBuilder.getResourceLink(request,"/themes/commons/css/customStyle.css")%>" type="text/css" />

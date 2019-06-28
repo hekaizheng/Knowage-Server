@@ -18,9 +18,9 @@
 package it.eng.spagobi.tools.dataset.bo;
 
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.json.JSONException;
@@ -736,7 +736,7 @@ public class VersionedDataSet implements IDataSet {
 	 * @see it.eng.spagobi.tools.dataset.bo.IDataSet#getDrivers()
 	 */
 	@Override
-	public HashMap<String, Object> getDrivers() {
+	public Map<String, Object> getDrivers() {
 		return wrappedDataset.getDrivers();
 	}
 
@@ -746,7 +746,17 @@ public class VersionedDataSet implements IDataSet {
 	 * @see it.eng.spagobi.tools.dataset.bo.IDataSet#setDrivers(java.util.HashMap)
 	 */
 	@Override
-	public void setDrivers(HashMap<String, Object> drivers) {
+	public void setDrivers(Map<String, Object> drivers) {
 		wrappedDataset.setDrivers(drivers);
+	}
+
+	@Override
+	public Set getTags() {
+		return wrappedDataset.getTags();
+	}
+
+	@Override
+	public void setTags(Set tags) {
+		wrappedDataset.setTags(tags);
 	}
 }

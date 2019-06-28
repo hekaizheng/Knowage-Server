@@ -18,9 +18,9 @@
 package it.eng.spagobi.tools.dataset.bo;
 
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -126,9 +126,9 @@ public interface IDataSet extends Iterable<IRecord> {
 
 	void setParametersMap(Map<String, String> paramValues) throws JSONException;
 
-	HashMap<String, Object> getDrivers();
+	Map<String, Object> getDrivers();
 
-	void setDrivers(HashMap<String, Object> drivers);
+	void setDrivers(Map<String, Object> drivers);
 	// --------------------------------------------------------------------------------------------------
 
 	// profilation ...
@@ -239,10 +239,14 @@ public interface IDataSet extends Iterable<IRecord> {
 	/**
 	 * Get the values for a certain dataset's field, considering a optional filter.
 	 *
-	 * @param fieldName The dataset's field
-	 * @param start     The offset on results
-	 * @param limit     The limit on result
-	 * @param filter    The optional filter
+	 * @param fieldName
+	 *            The dataset's field
+	 * @param start
+	 *            The offset on results
+	 * @param limit
+	 *            The limit on result
+	 * @param filter
+	 *            The optional filter
 	 * @return The datastore containing the values for the dataset's field
 	 */
 	public IDataStore getDomainValues(String fieldName, Integer start, Integer limit, IDataStoreFilter filter);
@@ -307,5 +311,9 @@ public interface IDataSet extends Iterable<IRecord> {
 	void resolveParameters();
 
 	<T> T getImplementation(Class<T> clazz);
+
+	Set getTags();
+
+	public void setTags(Set tags);
 
 }

@@ -15,8 +15,9 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+agGrid.initialiseAgGridWithAngular1(angular);
+var datasetModule = angular.module('datasetModule', ['ngMaterial', 'angular-list-detail', 'sbiModule', 'angular_table', 'file_upload', 'ui.codemirror','expander-box', 'qbe_viewer','driversExecutionModule','agGrid', 'tagsModule']); //ADDDD ,'driversExecutionModule'
 
-var datasetModule = angular.module('datasetModule', ['ngMaterial', 'angular-list-detail', 'sbiModule', 'angular_table', 'file_upload', 'ui.codemirror','expander-box', 'qbe_viewer','driversExecutionModule']); //ADDDD ,'driversExecutionModule'
 
 datasetModule.config(['$mdThemingProvider', function($mdThemingProvider) {
 	$mdThemingProvider.theme('knowage')
@@ -24,7 +25,7 @@ datasetModule.config(['$mdThemingProvider', function($mdThemingProvider) {
 }]);
 
 datasetModule
-	.controller('datasetController', ["$scope", "$log", "$http", "sbiModule_config", "sbiModule_translate", "sbiModule_restServices", "sbiModule_messaging", "sbiModule_user","$mdDialog", "multipartForm", "$timeout", "$qbeViewer","$q" ,"driversExecutionService",datasetFunction]) /// aaddd ,"driversExecutionService"
+	.controller('datasetController', ["$scope", "$log", "$http", "sbiModule_config", "sbiModule_translate", "sbiModule_restServices", "sbiModule_messaging", "sbiModule_user","$mdDialog", "multipartForm", "$timeout", "$qbeViewer","$q" ,"driversExecutionService", "$filter", "$mdSidenav","tagsHandlerService","sbiModule_urlBuilderService", datasetFunction]) /// aaddd ,"driversExecutionService"
 	.service('multipartForm',['$http',function($http){
 
 			this.post = function(uploadUrl,data){
@@ -42,7 +43,7 @@ datasetModule
 		}]);
 
 
-function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_translate, sbiModule_restServices, sbiModule_messaging, sbiModule_user, $mdDialog, multipartForm, $timeout, $qbeViewere , $q,driversExecutionService){
+function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_translate, sbiModule_restServices, sbiModule_messaging, sbiModule_user, $mdDialog, multipartForm, $timeout, $qbeViewer , $q, driversExecutionService, $filter, $mdSidenav,tagsHandlerService, sbiModule_urlBuilderService){
 
 	$scope.maxSizeStr = maxSizeStr;
 
@@ -55,66 +56,26 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 	$scope.dateFormatDefault = "dd/MM/yyyy";
 	$scope.timestampFormatDefault = "dd/MM/yyyy HH:mm:ss";
 	$scope.datasetParameters = []
-
-    $scope.setParametersAsDrivers = function(parameters,drivers){
-		for(var i = 0; i < parameters.length; i++){
-			if(parameters[i].type == "Number"){
-				var newDriver = {
-						urlName:parameters[i].name,
-						dependsOn:{},
-						selectedLayerProp:null,
-						dataDependencies:[],
-						valueSelection:"man_in",
-						showOnPanel:"true",
-						driverUseLabel:"parameter",
-						label : parameters[i].name,
-						selectedLayer:null,
-						type:"NUM",
-						driverLabel:"parameter",
-						mandatory:false,
-						allowInternalNodeSelection:false,
-						lovDependencies:[],
-						typeCode:"MAN_IN",
-						multivalue: parameters[i].multivalue,
-						selectionType:"",
-						visualDependencies:[],
-						"id":i,
-						defaultValues: [parameters[i].defaultValue]
-
-				}
-			}else{
-				var newDriver = {
-						urlName:parameters[i].name,
-						dependsOn:{},
-						selectedLayerProp:null,
-						dataDependencies:[],
-						valueSelection:"man_in",
-						showOnPanel:"true",
-						driverUseLabel:"parameter",
-						label : parameters[i].name,
-						selectedLayer:null,
-						type:"STRING",
-						driverLabel:"parameter",
-						mandatory:false,
-						allowInternalNodeSelection:false,
-						lovDependencies:[],
-						typeCode:"MAN_IN",
-						multivalue: parameters[i].multivalue,
-						selectionType:"",
-						visualDependencies:[],
-						"id":i,
-						defaultValues: [parameters[i].defaultValue]
-				}
-			}
-			$scope.documentParameters.push(newDriver)
-		}
-	}
+	$scope.allTags = [];
+	$scope.tags = [];
+	$scope.location = "catalog"
+	var parameterDeletingMessage = "Are you sure you want to delete the dataset parameter ? ";
+	var qbeParameterDeletingMessage = "";
+	var urlBuilderService = sbiModule_urlBuilderService;
 
 	$scope.$watch("selectedDataSet.restNGSI",function(newValue,oldValue){
 		if(newValue && (newValue===true || newValue==="true")){
 			$scope.selectedDataSet.restNGSI = true;
 		}
 	});
+
+	var getAllTags = function(){
+		sbiModule_restServices.promiseGet("2.0/tags","")
+		.then(function(response) {
+			$scope.allTags = response.data;
+		});
+	}
+    getAllTags();
 
 	$scope.$watch("selectedDataSet.restDirectlyJSONAttributes",function(newValue,oldValue){
 		if(newValue && (newValue===true || newValue==="true")){
@@ -162,7 +123,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 	$scope.restDsRequestAdditionalParametersTableLastPage = 1;
 	$scope.restDsJsonPathAttribTableLastPage = 1;
 
-	$scope.currentPageNumber = 1;
+	$scope.currentPageNumber = 0;
 
 	$scope.fileObj={};
 	$scope.selectedTab = 0;	// Initially, the first tab is selected.
@@ -865,7 +826,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 			hideTooltip:true,
 
         	transformer: function() {
-        		return '<md-input-container class="md-block" style="margin:0"><input ng-model="row.defaultValue" ng-change="scopeFunctions.setFormDirty()"></md-input-container>';
+        		return '<md-input-container class="md-block" style="margin:0"><input ng-trim="false" ng-model="row.defaultValue" ng-change="scopeFunctions.setFormDirty()"></md-input-container>';
         	}
 		},
 
@@ -943,7 +904,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 			 	// TODO: translate
 		    	var confirm = $mdDialog.confirm()
 			         .title("Delete dataset parameter")
-			         .textContent("Are you sure you want to delete the dataset parameter?")
+			         .textContent($scope.selectedDataSet.dsTypeCd == "Qbe" ? qbeParameterDeletingMessage : parameterDeletingMessage)
 			         .ariaLabel("Delete dataset parameter")
 			         .ok($scope.translate.load("sbi.general.yes"))
 			         .cancel($scope.translate.load("sbi.general.No"));
@@ -1072,8 +1033,6 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 		 				break;
 		 			}
 		 		}
-
-
 	 		}
 
 	 	}
@@ -1083,7 +1042,11 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
     	$scope.customAttributes = [];
     }
 
-
+    $scope.filterByTags = function(){
+    	$timeout(function () {
+			$scope.datasetLike($scope.searchValue,$scope.itemsPerPage, $scope.currentPageNumber, $scope.columnsSearch, $scope.columnOrdering, $scope.reverseOrdering)
+		 }, 1000);
+    }
     $scope.datasetLike = function (searchValue, itemsPerPage,currentPageNumber, columnsSearch, columnOrdering, reverseOrdering) {
     	$scope.reverseOrdering = reverseOrdering;
     	$scope.columnOrdering = columnOrdering;
@@ -1092,12 +1055,21 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
     	if($scope.columnOrdering){
     		columnOrderingLabel = $scope.columnOrdering.name;
     	}
+    	urlBuilderService.setBaseUrl("countDataSetSearch/");
 
-    	if($scope.searchValue!=""){
-    		sbiModule_restServices.promiseGet("1.0/datasets", "countDataSetSearch/"+$scope.searchValue)
+    	if($scope.searchValue != "" || tagsHandlerService.getFilteredTagIds($scope.allTags).length > 0){
+
+    		var tags = {"tags":tagsHandlerService.getFilteredTagIds($scope.allTags)};
+    		var searchValue = {"searchValue" : $scope.searchValue}
+    		if($scope.searchValue != null)
+    		urlBuilderService.addQueryParams(searchValue);
+    		if(tagsHandlerService.getFilteredTagIds($scope.allTags).length > 0)
+    		urlBuilderService.addQueryParams(tags);
+    		var url = tagsHandlerService.getFilteredTagIds($scope.allTags).length > 0 || $scope.searchValue != null ?  urlBuilderService.build() : "countDataSets";
+    		sbiModule_restServices.promiseGet("1.0/datasets",  url)
     		.then(function(response) {
     			$scope.numOfDs = response.data;
-    			$scope.loadDatasetList(0, itemsPerPage, searchValue,  columnOrderingLabel,reverseOrdering);
+    			$scope.loadDatasetList(0, itemsPerPage, $scope.searchValue,  columnOrderingLabel,reverseOrdering);
     		}, function(response) {
     			sbiModule_messaging.showErrorMessage(response.data.errors[0].message, 'Error');
     		});
@@ -1109,45 +1081,51 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 
     $scope.changeDatasetPage=function(itemsPerPage,currentPageNumber){
     	$scope.currentItemsPerPage = itemsPerPage;
-    	$scope.currentPageNumber = currentPageNumber;
-    	if($scope.searchValue==undefined || $scope.searchValue.length==0 ){
-    		sbiModule_restServices.promiseGet("1.0/datasets", "countDataSets")
-    		.then(function(response) {
-    			$scope.numOfDs = response.data;
-    			var start = 0;
-    			if(currentPageNumber>1){
-    				start = (currentPageNumber - 1) * itemsPerPage;
-    			}
-    			if($scope.searchValue==undefined){
-    				$scope.searchValue = null;
-    			}
-    			if($scope.reverseOrdering==undefined){
-    				$scope.reverseOrdering=false;
-    			}
+    	if($scope.currentPageNumber != currentPageNumber){
+	    	$scope.currentPageNumber = currentPageNumber;
+	    	if($scope.searchValue==undefined || $scope.searchValue.length==0 ){
+	    		sbiModule_restServices.promiseGet("1.0/datasets", "countDataSets")
+	    		.then(function(response) {
+	    			$scope.numOfDs = response.data;
+	    			var start = 0;
+	    			if(currentPageNumber>1){
+	    				start = (currentPageNumber - 1) * itemsPerPage;
+	    			}
+	    			if($scope.searchValue==undefined){
+	    				$scope.searchValue = null;
+	    			}
+	    			if($scope.reverseOrdering==undefined){
+	    				$scope.reverseOrdering=false;
+	    			}
 
-    			var columnOrderingLabel = "";
-    	    	if($scope.columnOrdering){
-    	    		columnOrderingLabel = $scope.columnOrdering.name;
-    	    	}
-    			$scope.loadDatasetList(start, itemsPerPage, $scope.searchValue,columnOrderingLabel, $scope.reverseOrdering);
-    		}, function(response) {
-    			sbiModule_messaging.showErrorMessage(response.data.errors[0].message, 'Error');
-    		});
-		} else if ($scope.searchValue!=undefined || $scope.searchValue.length!=0) {
-
-			sbiModule_restServices.promiseGet("1.0/datasets", "countDataSetSearch/"+$scope.searchValue)
-    		.then(function(response) {
-    			$scope.numOfDs = response.data;
-    			var start = 0;
-    			if(currentPageNumber>1){
-    				start = (currentPageNumber - 1) * itemsPerPage;
-    			}
-    			$scope.loadDatasetList(start, itemsPerPage, $scope.searchValue, "",null);
-    		}, function(response) {
-    			sbiModule_messaging.showErrorMessage(response.data.errors[0].message, 'Error');
-    		});
-		}
-
+	    			var columnOrderingLabel = "";
+	    	    	if($scope.columnOrdering){
+	    	    		columnOrderingLabel = $scope.columnOrdering.name;
+	    	    	}
+	    			$scope.loadDatasetList(start, itemsPerPage, $scope.searchValue,columnOrderingLabel, $scope.reverseOrdering);
+	    		}, function(response) {
+	    			sbiModule_messaging.showErrorMessage(response.data.errors[0].message, 'Error');
+	    		});
+		} else if ($scope.searchValue!=undefined || $scope.searchValue.length!=0 ||  tagsHandlerService.getFilteredTagIds($scope.allTags).length > 0) {
+	    		var tags = {"tags":tagsHandlerService.getFilteredTagIds($scope.allTags)};
+	    	urlBuilderService.setBaseUrl("countDataSetSearch/");
+	        var tags = {"tags":tagsHandlerService.getFilteredTagIds($scope.allTags)};
+	        urlBuilderService.addQueryParams(tags);
+	    	var searchValue = {"searchValue" : $scope.searchValue}
+    		urlBuilderService.addQueryParams(searchValue);
+			sbiModule_restServices.promiseGet("1.0/datasets", urlBuilderService.build())
+	    		.then(function(response) {
+	    			$scope.numOfDs = response.data;
+	    			var start = 0;
+	    			if(currentPageNumber>1){
+	    				start = (currentPageNumber - 1) * itemsPerPage;
+	    			}
+	    			$scope.loadDatasetList(start, itemsPerPage, $scope.searchValue, "",null);
+	    		}, function(response) {
+	    			sbiModule_messaging.showErrorMessage(response.data.errors[0].message, 'Error');
+	    		});
+			}
+    	}
 	}
 
 	/*
@@ -1169,6 +1147,15 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 			queryParams = queryParams+"&ordering="+angular.toJson(ordering);
 		}
 
+		if(tagsHandlerService.getFilteredTagIds($scope.allTags).length > 0){
+    		//queryParams = queryParams+"&tags="+tagsHandlerService.getFilteredTagIds();
+			urlBuilderService.setBaseUrl("");
+			var tagsForSending = {"tags":tagsHandlerService.getFilteredTagIds($scope.allTags)}
+    		urlBuilderService.addQueryParams(tagsForSending);
+    		queryParams = queryParams+"&"+urlBuilderService.build().substr(1)
+		}
+
+
 		sbiModule_restServices.promiseGet("1.0/datasets","pagopt", queryParams)
 			.then(function(response) {
 				$scope.datasetsListTemp = angular.copy(response.data.root);
@@ -1179,8 +1166,14 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 						$scope.numOfDs = response.data;},function(response){
 							sbiModule_messaging.showErrorMessage(response.data.errors[0].message, 'Error');
 						});
-				} else if(filter!=null){
-					sbiModule_restServices.promiseGet("1.0/datasets", "countDataSetSearch/"+$scope.searchValue)
+				} else if(filter!=null || tagsHandlerService.getFilteredTagIds($scope.allTags).length > 0){
+					urlBuilderService.setBaseUrl("countDataSetSearch/");
+					var tags = {"tags":tagsHandlerService.getFilteredTagIds($scope.allTags)};
+					urlBuilderService.addQueryParams(tags);
+					var searchValue = {"searchValue" : $scope.searchValue}
+		    		urlBuilderService.addQueryParams(searchValue);
+					var url = (tagsHandlerService.getFilteredTagIds($scope.allTags).length == 0 && ($scope.searchValue == "" || $scope.searchValue == null)) ? "countDataSetSearch/" : urlBuilderService.build();
+					sbiModule_restServices.promiseGet("1.0/datasets",url)
 					.then(function(response) {
 						$scope.numOfDs = response.data;},function(response){
 							sbiModule_messaging.showErrorMessage(response.data.errors[0].message, 'Error');
@@ -1959,12 +1952,19 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 				$scope.setFormNotDirty();
 			}
 		}
-
+		 if($scope.selectedDataSet.dsTypeCd == "Qbe" && !qbeParameterDeletingMessage.includes("Qbe") ){
+				qbeParameterDeletingMessage =  parameterDeletingMessage + "Parameters for Qbe Dataset should be deleted from qbeDesigner";
+		 }
+		 if($scope.selectedDataSet.dsTypeCd == "Qbe" && item.hasOwnProperty('selected') && item.selected == true) {
+			 $scope.getDatasetParametersFromBusinessModel($scope.selectedDataSet);
+		 }
 
 	};
 	 $scope.getDatasetParametersFromBusinessModel = function (selectedDataset){
 			sbiModule_restServices.post("dataset","drivers/",selectedDataset.qbeDatamarts).then(function(response){
-				$scope.selectedDataSet.drivers = response.data.filterStatus;
+				$scope.selectedDataSet.drivers = angular.copy(response.data.filterStatus);
+				var selectedModel = $filter('filter')($scope.datamartList, {name: $scope.selectedDataSet.qbeDatamarts},true)[0];
+				 if (!selectedModel) delete $scope.selectedDataSet.qbeJSONQuery;
 			})
 		}
 	var selectDataset = function(item,index) {
@@ -1972,7 +1972,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 		$scope.selectedDataSetInit = angular.copy(item);
 		$scope.selectedDataSet = angular.copy(item);
 		$scope.showSaveAndCancelButtons = true;
-
+		getTagsForDataset(item);
 		if($scope.selectedDataSet.pars.length > 0) {
 			$scope.disablePersisting = true;
 		} else {
@@ -2124,6 +2124,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 
 		var parameterItems = $scope.selectedDataSet.pars;
 		var parameterItemsLength = parameterItems.length;
+		if($scope.selectedDataSet.dsTypeCd == "Qbe")
 		 $scope.getDatasetParametersFromBusinessModel($scope.selectedDataSet);
 		for (j=0; j<parameterItemsLength; j++) {
 
@@ -2140,9 +2141,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 		}
 
 		$scope.parameterItems = parameterItemsTemp;
-		$scope.setParametersAsDrivers($scope.parameterItems,$scope.documentParameters)
-		console.log('$scope.documentParameters')
-		console.log($scope.documentParameters)
+
 		if ($scope.selectedDataSet.dsTypeCd.toLowerCase()=="rest") {
 			// Cast the REST NGSI (transform from the String)
 			if($scope.selectedDataSet.restNGSI){
@@ -2257,6 +2256,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 		$scope.setFormNotDirty();
 
 	}
+
 
 
 	var loadOlderVersions = function(id) {
@@ -2691,6 +2691,22 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
                                         );
                                 }
 
+
+                                if(tagsHandlerService.isTagDeleted() || $scope.tags.length > 0){
+                                	sbiModule_restServices.promisePost("2.0/datasets", response.data.id + "/dstags/" , angular.toJson(tagsHandlerService.prepareTagsForSending($scope.selectedDataSet.versNum + 1,$scope.tags))).then(function(response){
+                                		var array = response.data;
+                                		for(var i = 0; i < $scope.tags.length; i++){
+                                			var nameForFiltering = $scope.tags[i].name;
+                                			if(!$scope.tags[i].tagId){
+                                				var newTag =  ($filter('filter')(array,{name:nameForFiltering},true))[0]
+                                				$scope.tags[i].tagId = newTag.tagId;
+                                				$scope.allTags.push(newTag);
+                                }
+                                		}
+                                		$scope.filterByTags();
+                                	});
+                                }
+
                                 if( $scope.showDatasetScheduler){
                                     if($scope.selectedDataSet.isScheduled) {
                                         sbiModule_restServices.promisePost('scheduleree/persistence/dataset/id',response.data.id, angular.toJson($scope.selectedDataSet))
@@ -2926,7 +2942,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 		    preserveScope : true,
 		    parent : angular.element(document.body),
 		    controllerAs : 'openEditScriptDialogCtrl',
-		    templateUrl : sbiModule_config.contextName +'/js/src/angular_1.4/tools/catalogues/templates/EditDataSetScript.html',
+		    templateUrl : sbiModule_config.dynamicResourcesBasePath +'/angular_1.4/tools/catalogues/templates/EditDataSetScript.html',
 		    clickOutsideToClose : false,
 		    hasBackdrop : false
 		   });
@@ -3020,7 +3036,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 				    preserveScope : true,
 				    parent : angular.element(document.body),
 				    controllerAs : 'datasetController',
-				    templateUrl : sbiModule_config.contextName +'/js/src/angular_1.4/tools/catalogues/templates/qbeQueryView.html',
+				    templateUrl : sbiModule_config.dynamicResourcesBasePath +'/angular_1.4/tools/catalogues/templates/qbeQueryView.html',
 				    clickOutsideToClose : false,
 				    hasBackdrop : true
 			   });
@@ -3095,7 +3111,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 							    preserveScope : true,
 							    parent : angular.element(document.body),
 							    controllerAs : 'datasetController',
-							    templateUrl : sbiModule_config.contextName +'/js/src/angular_1.4/tools/catalogues/templates/datasetRestParamsInfo.html',
+							    templateUrl : sbiModule_config.dynamicResourcesBasePath +'/angular_1.4/tools/catalogues/templates/datasetRestParamsInfo.html',
 							    clickOutsideToClose : false,
 							    hasBackdrop : true
 						   });
@@ -3115,38 +3131,37 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 	 * ========================================
 	 */
 
-	function DatasetPreviewController($scope,$mdDialog,$http) {
-		$scope.executeParameter = function(){
-			$scope.showQbe = true;
-			$scope.dataset.executed = true;
-			$scope.selectedDataSet.parametersString = driversExecutionService.buildStringParameters($scope.drivers);
-			sbiModule_restServices.promisePost('1.0/datasets','preview', angular.toJson($scope.selectedDataSet))
-			.then(function(response){
-				response.data.rows.push({id: 2, column_1: "Sheki Turkovic"})
-					$scope.getPreviewSet(response.data);
-			})
-		}
+	function DatasetPreviewController($scope,$mdDialog,$http,$sce) {
+			if($scope.selectedDataSet && $scope.selectedDataSet.dsTypeCd == "Qbe"){
+				$scope.dataset = $scope.selectedDataSet;
+				$scope.drivers = $scope.dataset.drivers;
+				$scope.showDrivers = driversExecutionService.hasMandatoryDrivers($scope.drivers) || $scope.selectedDataSet.pars.length > 0;
+				$scope.dataset.executed = !$scope.showDrivers;
 
-			$scope.dataset = $scope.selectedDataSet;
-			$scope.drivers = $scope.dataset.drivers;
-			for(var i = 0; i < $scope.drivers.length;i++){
-				$scope.dataset.executed = true;
-				if($scope.drivers[i].mandatory){
-					$scope.dataset.executed = false;
-					break;
+				$scope.executeParameter = function(){
+					$scope.showDrivers = false;
+					$scope.dataset.executed = true;
+					$scope.selectedDataSet["DRIVERS"] =  driversExecutionService.prepareDriversForSending($scope.drivers);
+					sbiModule_restServices.promisePost('1.0/datasets','preview', angular.toJson($scope.selectedDataSet))
+						.then(function(response){
+							$scope.getPreviewSet(response.data);
+						},
+					function(response) {
+						// Since the repsonse contains the error that is related to the Query syntax and/or content, close the parameters dialog
+						$mdDialog.cancel();
+						sbiModule_messaging.showErrorMessage($scope.translate.load(response.data.errors[0].message), 'Error');
+					})
 				}
-			}
-			$scope.showDrivers = true;
-			if(!$scope.drivers){
-				$scope.showDrivers = false;
+
+				$scope.toggleDrivers =function(){
+					$scope.showDrivers = !$scope.showDrivers;
+				}
+			}else{
+				$scope.dataset = {}
 				$scope.dataset.executed = true;
+				$scope.drivers = [];
+				$scope.showDrivers = false;
 			}
-
-			$scope.hideDrivers =function(){
-				$scope.showDrivers = true;
-				$scope.dataset.executed = !$scope.dataset.executed;
-			}
-
 		$scope.closeDatasetPreviewDialog=function(){
 			 $scope.previewDatasetModel=[];
 			 $scope.previewDatasetColumns=[];
@@ -3185,16 +3200,13 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 
 	$scope.checkIfDataSetHasParameters = function () {
 		$scope.selectedDataSet.pars = $scope.parameterItems;
+		if($scope.selectedDataSet && $scope.selectedDataSet.dsTypeCd == "Qbe"){
+			var hasParameters = false;
+		}else{
 		var hasParameters = $scope.selectedDataSet.pars != undefined && $scope.selectedDataSet.pars.length>0
-		$scope.selectedDataSet.parametersData = {};
-		$scope.selectedDataSet.parametersData.documentParameters = {}
-
-		$scope.getParameters = function(){
-
-			return $scope.documentParameters;
 		}
-
-		//$scope.selectedDataSet.parametersData.documentParameters = $scope.documentParameters;
+		$scope.selectedDataSet.parametersData = {};
+		$scope.selectedDataSet.parametersData.documentParameters = {};
 
 		if(hasParameters){
 			$scope.parameterPreviewItems = $scope.parameterItems;
@@ -3207,7 +3219,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 				{
 					scope:$scope,
 					preserveScope: true,
-					templateUrl: sbiModule_config.contextName + '/js/src/angular_1.4/tools/catalogues/templates/checkDatasetParamsBeforePreviewDialog.html'
+					templateUrl: sbiModule_config.dynamicResourcesBasePath + '/angular_1.4/tools/catalogues/templates/checkDatasetParamsBeforePreviewDialog.html'
 				}
 			)
 		} else {
@@ -3261,10 +3273,41 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 			$scope.selectedDataSet.restJsonPathAttributes = angular.copy(JSON.stringify($scope.restJsonPathAttributes));
 
 		}
-		$scope.selectedDataSet.parametersString = driversExecutionService.buildStringParameters($scope.selectedDataSet.drivers);
+
+		if(typeof $scope.selectedDataSet.drivers !== 'undefined') {
+			for(var i=0; i < $scope.selectedDataSet.drivers.length; i++) {
+				if($scope.selectedDataSet.drivers[i].parameterDescription && $scope.selectedDataSet.drivers[i].parameterValue) {
+					delete $scope.selectedDataSet.drivers[i].parameterDescription;
+					delete $scope.selectedDataSet.drivers[i].parameterValue;
+				}
+			}
+		}
+
+		$scope.selectedDataSet["DRIVERS"] = driversExecutionService.prepareDriversForSending($scope.selectedDataSet.drivers);
 		sbiModule_restServices.promisePost('1.0/datasets','preview', angular.toJson($scope.selectedDataSet))
 			.then(
 				function(response) {
+					 $scope.gridOptions = {
+				        enableColResize: true,
+				        enableSorting: false,
+					    enableFilter: false,
+					    pagination: false,
+					    suppressDragLeaveHidesColumns : true,
+				        headerHeight: 48,
+				        columnDefs :getColumns(response.data.metaData.fields),
+				    	rowData: response.data.rows
+					};
+
+				    function getColumns(fields) {
+						var columns = [];
+						for(var f in fields){
+							if(typeof fields[f] != 'object') continue;
+							var tempCol = {"headerName":fields[f].header,"field":fields[f].name, "tooltipField":fields[f].name};
+							tempCol.headerComponentParams = {template: headerTemplate(fields[f].type)};
+							columns.push(tempCol);
+						}
+						return columns;
+					}
 					$scope.getPreviewSet(response.data);
 					if(response.data.rows.length==0){
 						 $mdDialog.show(
@@ -3280,7 +3323,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 							  scope:$scope,
 							  preserveScope: true,
 						      controller: DatasetPreviewController,
-						      templateUrl: sbiModule_config.contextName+'/js/src/angular_1.4/tools/workspace/templates/datasetPreviewDialogTemplate.html',
+						      templateUrl: sbiModule_config.dynamicResourcesBasePath+'/angular_1.4/tools/workspace/templates/datasetPreviewDialogTemplate.html',
 						      clickOutsideToClose:false,
 						      escapeToClose :false
 						    });
@@ -3305,6 +3348,21 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 
     }
 
+    function headerTemplate(type) {
+		return 	'<div class="ag-cell-label-container data-type-'+type+'" role="presentation">'+
+				'	 <span ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"></span>'+
+				'    <div ref="eLabel" class="ag-header-cell-label" role="presentation">'+
+				'       <span ref="eText" class="ag-header-cell-text" role="columnheader"></span>'+
+				'       <span ref="eFilter" class="ag-header-icon ag-filter-icon"></span>'+
+				'       <span ref="eSortOrder" class="ag-header-icon ag-sort-order" ></span>'+
+				'    	<span ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" ></span>'+
+				'   	<span ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" ></span>'+
+				'  		<span ref="eSortNone" class="ag-header-icon ag-sort-none-icon" ></span>'+
+				'		<span class="ag-cell-type">'+type+'</span>'+
+				'	</div>'+
+				'</div>';
+	}
+
     $scope.getPreviewSet = function(data){
     	if(data!=null){
     		$scope.newDatasetMeta = data;
@@ -3322,9 +3380,11 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 	   		 	$scope.endPreviewIndex = $scope.itemsPerPage;
 	   		 	$scope.disableNext = false;
 	       	}
-
        	}
 	    angular.copy($scope.newDatasetMeta.rows,$scope.previewDatasetModel);
+	    if($scope.gridOptions && $scope.gridOptions.api) {
+	    	$scope.gridOptions.api.setRowData($scope.previewDatasetModel);
+	    }
 	    if( !$scope.previewDatasetColumns || $scope.previewDatasetColumns.length==0){
 	    	$scope.createColumnsForPreview($scope.newDatasetMeta.metaData.fields);
 	    }
@@ -3644,7 +3704,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 							    preserveScope : true,
 							    parent : angular.element(document.body),
 							    controllerAs : 'datasetController',
-							    templateUrl : sbiModule_config.contextName + '/js/src/angular_1.4/tools/catalogues/templates/helpDataSet.html',
+							    templateUrl : sbiModule_config.dynamicResourcesBasePath + '/angular_1.4/tools/catalogues/templates/helpDataSet.html',
 							    clickOutsideToClose : false,
 							    hasBackdrop : true
 						   });
@@ -3669,7 +3729,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
     		    scope : $scope,
     		    preserveScope : true,
     		    parent : angular.element(document.body),
-    		    templateUrl : sbiModule_config.contextName +'/js/src/angular_1.4/tools/catalogues/templates/fieldsMetadata.html',
+    		    templateUrl : sbiModule_config.dynamicResourcesBasePath +'/angular_1.4/tools/catalogues/templates/fieldsMetadata.html',
     		    clickOutsideToClose : false,
     		    hasBackdrop : false
     		   });
@@ -3699,7 +3759,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 		    scope : $scope,
 		    preserveScope : true,
 		    parent : angular.element(document.body),
-		    templateUrl : sbiModule_config.contextName +'/js/src/angular_1.4/tools/catalogues/templates/avaliableProfileAttributes.html',
+		    templateUrl : sbiModule_config.dynamicResourcesBasePath +'/angular_1.4/tools/catalogues/templates/avaliableProfileAttributes.html',
 		    clickOutsideToClose : false,
 		    hasBackdrop : false
 		   });
@@ -3759,13 +3819,15 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
     	  var url = null;
     	     if(dataset.dsTypeCd=='Federated'){
     	      url = datasetParameters.qbeEditFederatedDataSetServiceUrl
-    	         +'&FEDERATION_ID='+dataset.federationId;
+    	         +'&FEDERATION_ID='+dataset.federationId
+    	         +'&DATA_SOURCE_ID='+ dataset.qbeDataSourceId;
     	     } else {
     	      var modelName= dataset.qbeDatamarts;
     	   var dataSource=dataset.qbeDataSource;
     	      url = datasetParameters.buildQbeDataSetServiceUrl
     	           +'&DATAMART_NAME='+modelName
-    	           +'&DATASOURCE_LABEL='+ dataSource;
+    	           +'&DATASOURCE_LABEL='+ dataSource
+    	           +'&DATA_SOURCE_ID='+ dataset.qbeDataSourceId;
     	     }
 
     	  //url = "http://localhost:8080/knowageqbeengine/servlet/AdapterHTTP?ACTION_NAME=BUILD_QBE_DATASET_START_ACTION&user_id=biadmin&NEW_SESSION=TRUE&SBI_LANGUAGE=en&SBI_COUNTRY=US&DATASOURCE_LABEL=foodmart&DATAMART_NAME=foodmart";
@@ -3785,8 +3847,10 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 				function(responseDS) {
 
 					var savedDataset = responseDS.data[0];
-
 					$scope.selectedDataSet = angular.copy(savedDataset);
+
+					$scope.getDatasetParametersFromBusinessModel($scope.selectedDataSet);
+
 					$scope.datasetsListTemp[index] = angular.copy($scope.selectedDataSet);
 					$scope.datasetsListPersisted = angular.copy($scope.datasetsListTemp);
 					$scope.selectedDataSetInit = angular.copy($scope.selectedDataSet);
@@ -3928,15 +3992,11 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 								splitWeekdays.push(weekdaysTemp[i]);
 							}
 
-							console.logsplitWeekdays();
-
 							$scope.scheduling.weekdaysSelected = splitWeekdays;
 							$scope.scheduling.weekdaysCustom = true;
 
 						}
 						else {
-							console.log("KOLOKOLLO");
-							console.log($scope.scheduling.weekdaysSelected );
 							$scope.scheduling.weekdaysSelected = [];
 							$scope.scheduling.weekdaysCustom = false;
 						}
@@ -4117,6 +4177,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
         			for(i=0;i<this.dsMetaValue.length;i++){
         			 if(this.dsMetaValue[i].VALUE_CD.toLowerCase()==="string".toLowerCase()||
         			    this.dsMetaValue[i].VALUE_CD.toLowerCase()==="double".toLowerCase()||
+        			    this.dsMetaValue[i].VALUE_CD.toLowerCase()==="long".toLowerCase()||
         			    this.dsMetaValue[i].VALUE_CD.toLowerCase()==="integer".toLowerCase()||
         			    this.dsMetaValue[i].VALUE_CD.toLowerCase()==="date".toLowerCase() ||
         			    this.dsMetaValue[i].VALUE_CD.toLowerCase()==="timestamp".toLowerCase())
@@ -4402,20 +4463,34 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 				loc.pnameView='<label>{{row.pname}}</label>';
 				loc.pvalueView='<md-select aria-label="pvalue-view" ng-model=row.pvalue class="noMargin" style=styleString><md-option ng-repeat="col in row.dsMetaValue" value="{{col.VALUE_CD}}" ng-click="scopeFunctions.valueChanged(col,row.indexOfRow)">{{col.VALUE_NM}}</md-option></md-select>';
 
+				var msg = '';
+
 				/**
 				 * Manage the Step 2 "Valid" column state according to the validation after submitting the Step 2.
 				 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
 				 */
 				if (($scope.validationPassed==true || $scope.validationError==true) && $scope.csvConfChanged==false) {
 
-					var invalidType = $scope.step2ValidationErrors!=null && $scope.step2ValidationErrors[0]['column_'+i] && $scope.step2ValidationErrors[0]['column_'+i]!="";
-					//{{translate.load('')}}
+					var columnName = loc.column;
 
-					// If type is invalid and there are validation errors in response.
-					var msg = invalidType && $scope.step2ValidationErrors[0]["column_"+i] ? $scope.step2ValidationErrors[0]["column_"+i] : "sbi.workspace.dataset.wizard.metadata.validation.success.title";
+					var invalidColumns = $filter('filter')($scope.step2ValidationErrors, {columnName: columnName}, true);
 
-					var invalidColumnValidContent = '<md-content><md-icon md-font-icon="fa fa-times fa-1x" class="invalidTypeMetadata" title="' + eval("sbiModule_translate.load(msg)") + '"></md-icon></md-content>';
-					var validColumnValidContent = '<md-content><md-icon md-font-icon="fa fa-check fa-1x" class="validTypeMetadata" title="' + eval("sbiModule_translate.load(msg)") + '"></md-icon></md-content>';
+					var invalidType = false;
+
+					if (invalidColumns != null && invalidColumns.length > 0 && invalidColumns[0]['column_' + i] != undefined) {
+						msg = invalidColumns[0]['column_' + i];
+						invalidType = true;
+						loc.columnErrorDetails = {
+							errors: invalidColumns,
+							skipRows: $scope.dataset.skipRows,
+							index: i
+						};
+					} else {
+						msg = "sbi.workspace.dataset.wizard.metadata.validation.success.title";
+					}
+
+					var invalidColumnValidContent = '<md-content class="metadataValidationColumn metadataInvalidColumn" ng-click="scopeFunctions.showErrorDetails(row.columnErrorDetails)"><div><div class="leftInavlidIcon"><md-icon md-font-icon="fa fa-times fa-1x" class="invalidTypeMetadata" title="' + eval("sbiModule_translate.load(msg)") + '" style="float:right;"></div></md-icon><div class="rightInvalidIcon"><md-icon md-font-icon="fa fa-info fa-1x" class="invalidTypeMetadata"></md-icon></div></div></md-content>';
+					var validColumnValidContent = '<md-content class="metadataValidationColumn metadataValidColumn"><md-icon md-font-icon="fa fa-check fa-1x" class="validTypeMetadata" title="' + eval("sbiModule_translate.load(msg)") + '"></md-icon></md-content>';
 
 					// Set the content of the "Valid" column for the current row to an appropriate state (passed/failed validation).
 					loc.metaValid = (invalidType) ? invalidColumnValidContent : validColumnValidContent;
@@ -4426,8 +4501,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 					msg = "sbi.workspace.dataset.wizard.metadata.validation.pending.title";
 
 					// Set the state of the Step 2 "Valid" column to the initial value - pending for the validation (default state).
-//					loc.metaValid = '<md-content><md-icon md-font-icon="fa fa-circle-o fa-1x" style="background-color: #e6e6e6; width: 55%; padding-left: 45%; height: 100%" title="Pending for validation check..."></md-icon></md-content>';
-					loc.metaValid = '<md-content><md-icon md-font-icon="fa fa-question fa-1x" class="defaultStateValidType" title="' + eval("sbiModule_translate.load(msg)") + '"></md-icon></md-content>';
+					loc.metaValid = '<md-content class="metadataValidationColumn metadataDefaultColumn"><md-icon md-font-icon="fa fa-question fa-1x" class="defaultStateValidType" title="' + eval("sbiModule_translate.load(msg)") + '"></md-icon></md-content>';
 
 				}
 			}
@@ -4459,6 +4533,45 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 				values[i].pvalue = typeValue;
 			}
 		}
+	}
+
+	$scope.metaScopeFunctions.showErrorDetails = function(columnErrorDetails) {
+
+		$mdSidenav('errors-columndetails-sidenav')
+			.open()
+			.then(function(){
+
+				$scope.columnErrorDetails = columnErrorDetails;
+				$scope.columnString = 'column_';
+				$scope.index = $scope.columnErrorDetails.index;
+		    	$scope.invalidColumn = $scope.columnErrorDetails.errors[0].columnName;
+		    	$scope.limit = 10;
+		    	$scope.errorsCount = $scope.columnErrorDetails.errors.length;
+
+		    	$scope.showMoreErrorsButton = function() {
+		    		return $scope.errorsCount > $scope.limit;
+		    	}
+
+		    	$scope.remainingErros = function() {
+		    		return $scope.errorsCount - $scope.limit;
+		    	}
+
+		    	$scope.extandErrorList = function() {
+		    		if($scope.showMoreErrorsButton()) {
+		    			$scope.limit += $scope.limit;
+		    		} else {
+		    			$scope.limit = $scope.remainingErros();
+		    		}
+		    	}
+			});
+	}
+
+	$scope.closeErrorDetails = function() {
+		$mdSidenav('errors-columndetails-sidenav')
+			.close()
+			.then(function(){
+				$scope.columnErrorDetails = {};
+			});
 	}
 
 	/**
@@ -4526,6 +4639,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 				 if($scope.dsMetaValue[j].VALUE_CD.toLowerCase()==="string".toLowerCase() && insertString ||
 						 $scope.dsMetaValue[j].VALUE_CD.toLowerCase()==="double".toLowerCase()||
 						 $scope.dsMetaValue[j].VALUE_CD.toLowerCase()==="integer".toLowerCase()||
+						 $scope.dsMetaValue[j].VALUE_CD.toLowerCase()==="long".toLowerCase()||
 						 $scope.dsMetaValue[j].VALUE_CD.toLowerCase()==="date".toLowerCase() ||
 						 $scope.dsMetaValue[j].VALUE_CD.toLowerCase()==="timestamp".toLowerCase()){
 					 filteredMetaValues.push($scope.dsMetaValue[j]);
@@ -4564,6 +4678,14 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 	}
 
     $scope.metaScopeFunctions.dsGenMetaProperty = $scope.dsGenMetaProperty;
+
+
+    // TAGS
+
+
+	 var getTagsForDataset = function(dataset){
+			 $scope.tags = dataset.tags;
+	 }
 
 
 };

@@ -113,14 +113,13 @@ public class RESTDataProxy extends AbstractDataProxy {
 			Helper.checkNotNull(dataReader, "dataReader");
 
 			List<NameValuePair> query = getQuery();
-			Response response = RestUtilities.makeRequest(this.method, setPaginationParameters(this.address, dataReader), this.requestHeaders, this.requestBody,
+			Response response = RestUtilities.makeRequest(this.method, this.address, this.requestHeaders, this.requestBody,
 					query);
 			String responseBody = response.getResponseBody();
 			if (response.getStatusCode() != HttpStatus.SC_OK) {
 				throw new RESTDataProxyException(
 						String.format("The response status is not ok: status=%d, response=%s", response.getStatusCode(), responseBody));
 			}
-
 			Assert.assertNotNull(responseBody, "responseBody is null");
 			dataReader.setCalculateResultNumberEnabled(calculateResultNumberOnLoad);
 			IDataStore res = dataReader.read(responseBody);

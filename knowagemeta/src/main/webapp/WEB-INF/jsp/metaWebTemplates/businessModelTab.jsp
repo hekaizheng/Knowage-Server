@@ -26,10 +26,10 @@
 							  					<span>{{col.name}}</span>
 						  					</div>
 						  					<div flex="30">
-									  			<md-button class="md-secondary md-icon-button" ng-if="!$first" ng-click="moveUp($index, bm.columns)" aria-label="Move up property" >
+									  			<md-button class="md-secondary md-icon-button" ng-if="!$first" ng-click="moveUp($index, bm)" aria-label="Move up property" >
 									  				<md-icon md-font-icon="fa fa-arrow-up"></md-icon>
 									  			</md-button>
-									  			<md-button class="md-secondary md-icon-button" ng-if="!$last" ng-click="moveDown($index, bm.columns)" aria-label="Move down property" >
+									  			<md-button class="md-secondary md-icon-button" ng-if="!$last" ng-click="moveDown($index, bm)" aria-label="Move down property" >
 									  				<md-icon md-font-icon="fa fa-arrow-down"></md-icon>
 									  			</md-button>
 						  					</div>
@@ -235,10 +235,15 @@
 				</md-content>
 			</md-tab>
 			
-			<md-tab id="filters-Tab" md-active="tabResource.selectedBusinessTab=='sqlFilterTab'" md-on-select="tabResource.selectedBusinessTab='sqlFilterTab'" label="{{translate.load('sbi.meta.model.business.filter')}}">
-				<md-content ng-controller="businessModelSqlFilterController" layout layout-fill>
-  					<div flex ng-repeat="bmProperty in selectedBusinessModel.properties" ng-if="bmProperty['structural.sqlFilter']">
+			<md-tab id="filters-Tab" md-active="tabResource.selectedBusinessTab=='sqlFilterTab'" md-on-select="tabResource.selectedBusinessTab='sqlFilterTab'" label="{{translate.load('sbi.meta.model.business.filter')}}" ng-if="selectedBusinessModel.columns!=undefined">
+				<md-content ng-controller="businessModelSqlFilterController" layout layout-fill ng-if="tabResource.selectedBusinessTab=='sqlFilterTab'">					
+  					<div flex ng-repeat="bmProperty in selectedBusinessModel.properties" ng-if="bmProperty['structural.sqlFilter']">	  					
 						<md-input-container class="md-block">
+				          	<md-icon md-menu-origin class="fa fa-question-circle">
+								<md-tooltip md-direction="bottom">							
+									{{translate.load("sbi.meta.model.business.filter.helpMessage")}}
+								</md-tooltip>
+							</md-icon>
 							<textarea ng-model="bmProperty['structural.sqlFilter'].value" placeholder="SQL expression"></textarea>
 						</md-input-container>
   					</div> 

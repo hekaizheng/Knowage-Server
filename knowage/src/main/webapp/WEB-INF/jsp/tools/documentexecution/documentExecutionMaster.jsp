@@ -16,6 +16,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 --%>
 
+<%@page import="java.util.regex.Matcher"%>
+<%@page import="java.util.regex.Pattern"%>
 <%@page import="it.eng.spagobi.analiticalmodel.document.dao.IBIObjectDAO"%>
 <%@page import="it.eng.spagobi.analiticalmodel.document.dao.BIObjectDAOHibImpl"%>
 <%@page import="it.eng.spagobi.analiticalmodel.document.bo.BIObject"%>
@@ -78,6 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 				objectName = request.getParameter("OBJECT_NAME") != null ? request.getParameter("OBJECT_NAME").toString(): aRequestContainer.getServiceRequest()
 						.getAttribute("OBJECT_NAME").toString();
 			}
+			
+			String cockpitParameters = request.getParameter("COCKPIT_PARAMETER") != null ? request.getParameter("COCKPIT_PARAMETER") : "null";
+			
 %>
 		
 		var obj = { 
@@ -87,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 				'OBJECT_LABEL' : 		'<%=request.getParameter("OBJECT_LABEL") != null
 					? request.getParameter("OBJECT_LABEL")
 					: aRequestContainer.getServiceRequest().getAttribute("OBJECT_LABEL")%>',
-				'OBJECT_NAME' : 		'<%=objectName%>',
+				'OBJECT_NAME' : 		'<%=objectName.replaceAll(Pattern.quote("'"), Matcher.quoteReplacement("\\'"))%>',
 				'isSourceDocument' : 	'<%=request.getParameter("IS_SOURCE_DOCUMENT") != null
 					? request.getParameter("IS_SOURCE_DOCUMENT")
 					: aRequestContainer.getServiceRequest().getAttribute("IS_SOURCE_DOCUMENT")%>',
@@ -97,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 					? request.getParameter("EDIT_MODE")
 					: aRequestContainer.getServiceRequest().getAttribute("EDIT_MODE")%>',
 				'EXEC_FROM': '<%=request.getParameter("EXEC_FROM")%>',
-				'COCKPIT_PARAMETER' : '<%=request.getParameter("COCKPIT_PARAMETER")%>',
+				'COCKPIT_PARAMETER' : '<%=cockpitParameters.replaceAll(Pattern.quote("'"), Matcher.quoteReplacement("\\'"))%>',
 				'IS_FROM_DOCUMENT_WIDGET' : '<%=request.getParameter("IS_FROM_DOCUMENT_WIDGET")%>',
                 'TOOLBAR_VISIBLE' : '<%=request.getParameter("TOOLBAR_VISIBLE")%>',
                 'CAN_RESET_PARAMETERS' : '<%=request.getParameter("CAN_RESET_PARAMETERS")%>',

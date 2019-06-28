@@ -33,6 +33,7 @@ import org.apache.log4j.Logger;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.json.JSONObjectDeserializator;
 
 import it.eng.qbe.datasource.transaction.ITransaction;
 import it.eng.qbe.query.ISelectField;
@@ -64,6 +65,7 @@ import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.engines.EngineConstants;
 import it.eng.spagobi.utilities.engines.SpagoBIEngineException;
 import it.eng.spagobi.utilities.engines.SpagoBIEngineServiceExceptionHandler;
+import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
 import it.eng.spagobi.utilities.mime.MimeUtils;
 
 /**
@@ -79,6 +81,8 @@ public class ExportResultAction extends AbstractQbeEngineAction {
 	// misc
 	public static final String RESPONSE_TYPE_INLINE = "RESPONSE_TYPE_INLINE";
 	public static final String RESPONSE_TYPE_ATTACHMENT = "RESPONSE_TYPE_ATTACHMENT";
+
+	public static final String DRIVERS = "DRIVERS";
 
 	/** Logger component. */
 	public static transient Logger logger = Logger.getLogger(ExportResultAction.class);
@@ -149,7 +153,9 @@ public class ExportResultAction extends AbstractQbeEngineAction {
 				// logger.debug("Parametric query: [" + statement.getQueryString() + "]");
 
 				statement.setParameters(getEnv());
+
 				jpaQueryStr = statement.getQueryString();
+
 				logger.debug("Executable HQL/JPQL query: [" + jpaQueryStr + "]");
 
 				sqlQuery = statement.getSqlQueryString();
@@ -233,6 +239,7 @@ public class ExportResultAction extends AbstractQbeEngineAction {
 			try {
 
 				IDataSource dataSource = (IDataSource) getEngineInstance().getDataSource().getConfiguration().loadDataSourceProperties().get("datasource");
+
 				connection = dataSource.getConnection();
 			} catch (Exception e) {
 				logger.debug("Query execution aborted because of an internal exception");
@@ -337,6 +344,18 @@ public class ExportResultAction extends AbstractQbeEngineAction {
 			dataSet.addBinding("attributes", userAttributes);
 			dataSet.addBinding("parameters", this.getEnv());
 			logger.debug("Executing query ...");
+
+			Map<String, Object> envs = getEnv();
+			String stringDrivers = envs.get(DRIVERS).toString();
+			Map<String, Object> drivers = null;
+			try {
+				drivers = JSONObjectDeserializator.getHashMapFromString(stringDrivers);
+			} catch (Exception e) {
+				logger.debug("Drivers cannot be transformed from string to map");
+				throw new SpagoBIRuntimeException("Drivers cannot be transformed from string to map", e);
+			}
+			dataSet.setDrivers(drivers);
+
 			dataSet.loadData(start, limit, (maxSize == null ? -1 : maxSize.intValue()));
 
 			dataStore = dataSet.getDataStore();
